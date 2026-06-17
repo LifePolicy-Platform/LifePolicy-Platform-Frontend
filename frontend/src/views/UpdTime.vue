@@ -2,6 +2,7 @@
 import AptSearchForm from '@/components/appointment/AptSearchForm.vue'
 import AptResultsTable from '@/components/appointment/AptResultsTable.vue'
 import AptScheduleForm from '@/components/appointment/AptScheduleForm.vue'
+import PageHero from '@/components/layout/PageHero.vue'
 import { useUpdTime } from '@/composables/useUpdTime'
 
 const {
@@ -31,95 +32,107 @@ const {
 </script>
 
 <template>
-  <section class="appt-update-page">
-    <q-card flat bordered class="appt-panel">
-      <q-card-section class="appt-panel__header">
-        <h2 class="appt-title">重新安排約訪時間</h2>
-      </q-card-section>
+  <section class="page-with-hero appt-update-page">
+    <PageHero title="重新安排約訪時間" subtitle="查詢未完成訪名單並重新設定約訪時間" />
 
-      <q-separator />
+    <div class="page-body appt-body">
+      <q-card flat class="appt-card page-card">
+        <q-card-section class="appt-card__section">
+          <p class="section-label">查詢條件</p>
+          <div class="block-title">尚未完成的訪名單如下：</div>
 
-      <q-card-section class="appt-panel__body">
-        <div class="block-title">尚未完成的訪名單如下：</div>
+          <AptSearchForm
+            v-model:search-start-date="searchStartDate"
+            v-model:search-start-time="searchStartTime"
+            v-model:search-end-date="searchEndDate"
+            v-model:search-end-time="searchEndTime"
+            :range-error="rangeError"
+            @search="searchAppointments"
+          />
 
-        <AptSearchForm
-          v-model:search-start-date="searchStartDate"
-          v-model:search-start-time="searchStartTime"
-          v-model:search-end-date="searchEndDate"
-          v-model:search-end-time="searchEndTime"
-          :range-error="rangeError"
-          @search="searchAppointments"
-        />
+          <AptResultsTable
+            v-model:selected-row-ids="selectedRowIds"
+            v-model:all-selected="allSelected"
+            :rows="rows"
+            :has-searched="hasSearched"
+            :is-loading="isLoading"
+            :error-msg="errorMsg"
+            :selected-count-label="selectedCountLabel"
+            :has-partial-selection="hasPartialSelection"
+            :update-results="updateResults"
+          />
 
-        <AptResultsTable
-          v-model:selected-row-ids="selectedRowIds"
-          v-model:all-selected="allSelected"
-          :rows="rows"
-          :has-searched="hasSearched"
-          :is-loading="isLoading"
-          :error-msg="errorMsg"
-          :selected-count-label="selectedCountLabel"
-          :has-partial-selection="hasPartialSelection"
-          :update-results="updateResults"
-        />
-
-        <AptScheduleForm
-          v-model:update-mode="updateMode"
-          v-model:workdays-count="workdaysCount"
-          v-model:specific-date="specificDate"
-          v-model:specific-time="specificTime"
-          :save-error="saveError"
-          :is-saving="isSaving"
-          @save="saveUpdate"
-        />
-      </q-card-section>
-    </q-card>
+          <AptScheduleForm
+            v-model:update-mode="updateMode"
+            v-model:workdays-count="workdaysCount"
+            v-model:specific-date="specificDate"
+            v-model:specific-time="specificTime"
+            :save-error="saveError"
+            :is-saving="isSaving"
+            @save="saveUpdate"
+          />
+        </q-card-section>
+      </q-card>
+    </div>
   </section>
 </template>
 
 <style scoped>
 .appt-update-page {
-  display: flex;
-  justify-content: center;
-  width: 100%;
+  --notus-charcoal: #1a202c;
+  --notus-muted: #718096;
+  --notus-green: #48bb78;
+  --notus-green-dark: #38a169;
+  --notus-green-deep: #2f855a;
 }
 
-.appt-panel {
-  width: min(100%, 980px);
-  background: #ffffff;
-  border-color: #dce7e3;
-  border-radius: 4px;
-  box-shadow: 0 0 0 1px rgba(15, 118, 110, 0.12), 0 12px 26px rgba(15, 23, 42, 0.08);
+.appt-card__section {
+  padding: 28px 32px 32px;
 }
 
-.appt-panel__header {
-  min-height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px 56px;
-}
-
-.appt-title {
-  margin: 0;
-  color: #465a58;
-  font-size: 1.15rem;
-  font-weight: 700;
-}
-
-.appt-panel__body {
-  padding: 22px 34px 30px;
+.section-label {
+  margin: 0 0 6px;
+  color: var(--notus-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .block-title {
-  margin-bottom: 12px;
-  color: #08a66a;
+  margin-bottom: 16px;
+  color: var(--notus-charcoal);
+  font-size: 1rem;
   font-weight: 700;
 }
 
+.appt-card :deep(.block-title) {
+  margin-bottom: 12px;
+  color: var(--notus-green-deep);
+  font-weight: 700;
+}
+
+.appt-card :deep(.search-btn),
+.appt-card :deep(.save-btn) {
+  background: var(--notus-green) !important;
+}
+
+.appt-card :deep(.search-btn:hover),
+.appt-card :deep(.save-btn:hover) {
+  background: var(--notus-green-dark) !important;
+}
+
+.appt-card :deep(.q-radio__inner--truthy) {
+  color: var(--notus-green);
+}
+
+.appt-card :deep(.q-checkbox__inner--truthy) {
+  color: var(--notus-green);
+}
+
 @media (max-width: 760px) {
-  .appt-panel__body {
-    padding: 18px;
+  .appt-card__section {
+    padding: 20px 18px 24px;
   }
 }
 </style>

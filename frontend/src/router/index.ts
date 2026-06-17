@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type RouteMeta } from 'vue-router'
 import { setupRouterGuards } from './guards'
+import HomeView from '../views/HomeView.vue'
 import UpdTime from '../views/UpdTime.vue'
 import PolicySearchView from '../views/PolicySearchView.vue'
 import CartTotalView from '../views/CartTotalView.vue'
@@ -8,7 +9,12 @@ import LoginView from '../views/LoginView.vue'
 import TodoListView from '../views/TodoListView.vue'
 import SearchView from '../views/SearchView.vue'
 import ProductDetailView from '../views/ProductDetailView.vue'
-import Workbench from '../views/Workbench.vue'
+import PolicyMgmtHubView from '../views/policy/PolicyMgmtHubView.vue'
+import PolicySearchListView from '../views/policy/PolicySearchListView.vue'
+import PolicyCreateView from '../views/policy/PolicyCreateView.vue'
+import PolicyReviewView from '../views/policy/PolicyReviewView.vue'
+import MyTasksView from '../views/MyTasksView.vue'
+import ProductListView from '../views/product/ProductListView.vue'
 
 export interface DemoRouteMeta extends Record<string, unknown> {
   shortLabel?: string
@@ -24,15 +30,65 @@ declare module 'vue-router' {
     guestOnly?: boolean
     /** true = 隱藏 sidebar（登入頁等） */
     hideSidebar?: boolean
+    /** true = 主內容區頂部為 Notus 大綠色區塊（Header 透明疊在上面） */
+    hasTopHero?: boolean
   }
 }
 
 const router = createRouter({
   history: createWebHistory(),
+  scrollBehavior(_to, _from, savedPosition) {
+    if (savedPosition) {
+      return savedPosition
+    }
+    return { top: 0, left: 0 }
+  },
   routes: [
     {
       path: '/',
-      redirect: '/policies',
+      redirect: '/home',
+    },
+    {
+      path: '/home',
+      name: 'home',
+      component: HomeView,
+      meta: { title: '首頁 Dashboard', label: '首頁 Dashboard', hasTopHero: true },
+    },
+    {
+      path: '/my-tasks',
+      name: 'my-tasks',
+      component: MyTasksView,
+      meta: { title: '個人待辦案件', label: '個人待辦案件', hasTopHero: true, requiresAuth: true },
+    },
+    {
+      path: '/policy-mgmt',
+      name: 'policy-mgmt',
+      component: PolicyMgmtHubView,
+      meta: { title: '保單管理', label: '保單查詢', hasTopHero: true, requiresAuth: true },
+    },
+    {
+      path: '/policy-mgmt/search',
+      name: 'policy-mgmt-search',
+      component: PolicySearchListView,
+      meta: { title: '保單查詢', label: '保單查詢', hasTopHero: true, requiresAuth: true },
+    },
+    {
+      path: '/policy-mgmt/create',
+      name: 'policy-mgmt-create',
+      component: PolicyCreateView,
+      meta: { title: '新增保單', label: '新增保單', hasTopHero: true, requiresAuth: true },
+    },
+    {
+      path: '/policy-mgmt/review',
+      name: 'policy-mgmt-review',
+      component: PolicyReviewView,
+      meta: { title: '審核保單', label: '審核保單', hasTopHero: true, requiresAuth: true },
+    },
+    {
+      path: '/products',
+      name: 'products',
+      component: ProductListView,
+      meta: { title: '商品維護', label: '商品維護', hasTopHero: true, requiresAuth: true },
     },
     {
       path: '/login',
@@ -50,7 +106,7 @@ const router = createRouter({
       path: '/updTime',
       name: 'updTime',
       component: UpdTime,
-      meta: { title: '重新安排約訪時間', label: '重新安排約訪時間', requiresAuth: true },
+      meta: { title: '重新安排約訪時間', label: '重新安排約訪時間', requiresAuth: true, hasTopHero: true },
     },
     {
       path: '/cart',
@@ -81,12 +137,6 @@ const router = createRouter({
       name: 'product-detail',
       component: ProductDetailView,
       meta: { title: '商品詳情', description: '單一商品數量與金額試算' },
-    },
-    {
-      path: '/workbench',
-      name: 'workbench',
-      component: Workbench,
-      meta: { title: '保單', description: '保單' },
     },
   ],
 })

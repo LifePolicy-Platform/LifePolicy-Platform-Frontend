@@ -115,7 +115,7 @@ const emit = defineEmits<{
 
 .search-btn {
   min-width: 72px;
-  background: #00a65a;
+  background: #48bb78;
   font-weight: 700;
 }
 

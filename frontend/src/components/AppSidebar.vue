@@ -2,12 +2,17 @@
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { SidebarNavItem } from '@/constants/navigation'
+import { scrollPageToTop } from '@/utils/scroll'
 
 const props = defineProps<{
   items: readonly SidebarNavItem[]
 }>()
 
 const searchQuery = ref('')
+
+function onNavClick() {
+  scrollPageToTop()
+}
 
 interface NavGroup {
   title: string
@@ -83,6 +88,7 @@ const hasResults = computed(() => filteredGroups.value.length > 0)
               :to="item.path"
               class="sidebar-menu__link"
               active-class="sidebar-menu__link--active"
+              @click="onNavClick"
             >
               <q-icon :name="item.icon" size="18px" class="sidebar-menu__icon" />
               <span class="sidebar-menu__label">{{ item.label }}</span>

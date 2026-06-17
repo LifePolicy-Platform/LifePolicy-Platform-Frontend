@@ -98,7 +98,7 @@ const workdayOptions = [1, 2, 3, 4, 5].map((day) => ({ label: String(day), value
 <style scoped>
 .block-title {
   margin-bottom: 12px;
-  color: #08a66a;
+  color: #2f855a;
   font-weight: 700;
 }
 
@@ -113,7 +113,7 @@ const workdayOptions = [1, 2, 3, 4, 5].map((day) => ({ label: String(day), value
 
 .update-radio-group :deep(.q-radio__label),
 .radio-line {
-  color: #475569;
+  color: #4a5568;
   font-weight: 700;
 }
 
@@ -183,7 +183,7 @@ const workdayOptions = [1, 2, 3, 4, 5].map((day) => ({ label: String(day), value
 
 .save-btn {
   min-width: 96px;
-  background: #00a65a;
+  background: #48bb78;
   font-weight: 700;
 }
 
