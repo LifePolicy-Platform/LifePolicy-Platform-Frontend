@@ -52,8 +52,8 @@ function openEdit(user: User) {
     username: user.USERNAME,
     password: '',
     displayName: user.DISPLAY_NAME,
-    role: user.ROLES[0] || 'APPLICANT',
-    enabled: user.Enabled
+    role: user.ROLE_CODE || 'APPLICANT',
+    enabled: user.STATUS === 'ACTIVE'
   }
   showForm.value = true
 }
@@ -81,7 +81,7 @@ async function handleSubmit() {
       await updateUser(form.value.username, {
         PASSWORD: form.value.password,
         DISPLAY_NAME: form.value.displayName,
-        ENABLED: form.value.enabled,
+        STATUS: form.value.enabled ? 'ACTIVE' : 'INACTIVE',
         ROLE: form.value.role
       })
       successMessage.value = `使用者 ${form.value.username} 修改成功`
@@ -98,14 +98,15 @@ async function handleSubmit() {
 // 停用/啟用使用者
 async function toggleUser(user: User) {
   try {
+    const newStatus = user.STATUS === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
     await updateUser(user.USERNAME, {
       PASSWORD: '',
       DISPLAY_NAME: user.DISPLAY_NAME,
-      ENABLED: !user.Enabled,
-      ROLE: user.ROLES[0] || 'APPLICANT'
+      STATUS: newStatus,
+      ROLE: user.ROLE_CODE || 'APPLICANT'
     })
     await loadUsers()
-    successMessage.value = `使用者 ${user.USERNAME} 已${!user.Enabled ? '啟用' : '停用'}`
+    successMessage.value = `使用者 ${user.USERNAME} 已${newStatus === 'ACTIVE' ? '啟用' : '停用'}`
   } catch {
     errorMessage.value = '操作失敗'
   }
@@ -206,20 +207,18 @@ onMounted(() => {
               <td>{{ user.USERNAME }}</td>
               <td>{{ user.DISPLAY_NAME }}</td>
               <td>
-                <span v-for="role in user.ROLES" :key="role" class="role-pill">
-                  {{ role }}
-                </span>
+                <span class="role-pill">{{ user.ROLE_CODE }}</span>
               </td>
               <td>
-                <span :class="user.Enabled ? 'badge-success' : 'badge-error'">
-                  {{ user.Enabled ? '啟用' : '停用' }}
+                <span :class="user.STATUS === 'ACTIVE' ? 'badge-success' : 'badge-error'">
+                  {{ user.STATUS === 'ACTIVE' ? '啟用' : '停用' }}
                 </span>
               </td>
               <td>
                 <div class="inline-actions">
                   <button class="action-button" @click="openEdit(user)">修改</button>
                   <button class="action-button" @click="toggleUser(user)">
-                    {{ user.Enabled ? '停用' : '啟用' }}
+                    {{ user.STATUS === 'ACTIVE' ? '停用' : '啟用' }}
                   </button>
                   <button class="action-button danger" @click="openDeleteConfirm(user)">
                     刪除

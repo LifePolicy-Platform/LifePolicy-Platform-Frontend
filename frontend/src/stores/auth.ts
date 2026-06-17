@@ -9,8 +9,8 @@ export const useAuthStore = defineStore('auth', () => {
   const currentUser = ref<CurrentUser | null>(null)
   const isAuthenticated = computed(() => Boolean(accessToken.value))
   const roles = computed(() => {
-    if (currentUser.value && currentUser.value.ROLES) {
-      return currentUser.value.ROLES
+    if (currentUser.value && currentUser.value.ROLE_CODE) {
+      return [currentUser.value.ROLE_CODE]
     }
     return []
   })
@@ -20,15 +20,15 @@ export const useAuthStore = defineStore('auth', () => {
     ACCESS_TOKEN: string
     USERNAME: string
     DISPLAY_NAME: string
-    ROLES: string[]
-  }) 
+    ROLE_CODE: string
+  })
   {
     setLocalStorageToken(data.ACCESS_TOKEN)
     accessToken.value = data.ACCESS_TOKEN
     currentUser.value = {
       USERNAME: data.USERNAME,
       DISPLAY_NAME: data.DISPLAY_NAME,
-      ROLES: data.ROLES,
+      ROLE_CODE: data.ROLE_CODE,
     }
   }
 
