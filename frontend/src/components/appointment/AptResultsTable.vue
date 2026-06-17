@@ -109,7 +109,7 @@ const allSelected = defineModel<boolean>('allSelected', { required: true })
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #334155;
+  color: #2d3748;
   font-weight: 700;
 }
 
@@ -118,19 +118,22 @@ const allSelected = defineModel<boolean>('allSelected', { required: true })
   align-items: center;
   min-height: 28px;
   padding: 2px 10px;
-  background: #fff7f7;
-  color: #334155;
+  background: #f0fff4;
+  color: #2f855a;
   font-size: 0.88rem;
+  border-radius: 4px;
 }
 
 .result-count {
-  color: #94a3b8;
+  color: #718096;
   font-weight: 700;
 }
 
 .appt-table-wrap {
   width: 100%;
-  border: 1px solid #d9e2dc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  overflow: hidden;
 }
 
 .appt-table-scroll {
@@ -146,14 +149,14 @@ const allSelected = defineModel<boolean>('allSelected', { required: true })
 }
 
 .appt-table thead tr {
-  background: #b7e642;
+  background: #edf2f7;
 }
 
 .appt-table th,
 .appt-table td {
   height: 32px;
   padding: 4px 10px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e2e8f0;
   text-align: center;
   white-space: nowrap;
 }
@@ -162,15 +165,15 @@ const allSelected = defineModel<boolean>('allSelected', { required: true })
   position: sticky;
   top: 0;
   z-index: 1;
-  color: #365314;
+  color: #4a5568;
   font-size: 0.85rem;
   font-weight: 700;
-  background: #b7e642;
-  box-shadow: 0 1px 0 #e5e7eb;
+  background: #edf2f7;
+  box-shadow: 0 1px 0 #e2e8f0;
 }
 
 .appt-table td {
-  color: #334155;
+  color: #2d3748;
   font-size: 0.84rem;
 }
 
@@ -182,9 +185,10 @@ const allSelected = defineModel<boolean>('allSelected', { required: true })
 .table-state {
   padding: 24px;
   text-align: center;
-  color: #64748b;
+  color: #718096;
   font-size: 0.9rem;
-  border: 1px solid #d9e2dc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
 }
 
 .table-state--error {
@@ -201,7 +205,7 @@ const allSelected = defineModel<boolean>('allSelected', { required: true })
 }
 
 .result-ok {
-  color: #16a34a;
+  color: #38a169;
   font-weight: 700;
 }
 

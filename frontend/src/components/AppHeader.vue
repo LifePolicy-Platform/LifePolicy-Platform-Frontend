@@ -37,7 +37,7 @@ onUnmounted(() => {
 })
 
 function goHome() {
-  router.push('/')
+  router.push('/home')
 }
 
 function toggleMenu(event: MouseEvent) {

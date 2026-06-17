@@ -75,15 +75,26 @@ export async function requestJson<T>(
   }
 
   const normalizedMethod = method.toUpperCase() as Method
-  const response = await http.request<ApiEnvelope<T>>({
-    url,
-    method: normalizedMethod,
-    data: normalizedMethod === 'GET' || normalizedMethod === 'HEAD' ? undefined : payload,
-    skipAuth: !requiresAuth,
-  })
-  
+  try {
+    const response = await http.request<ApiEnvelope<T>>({
+      url,
+      method: normalizedMethod,
+      data: normalizedMethod === 'GET' || normalizedMethod === 'HEAD' ? undefined : payload,
+      skipAuth: !requiresAuth,
+    })
 
-  return response.data
+    const body = response.data
+    if (body?.SUCCESS === false) {
+      throw new Error(body.MESSAGE || '請求失敗')
+    }
+
+    return body
+  } catch (error) {
+    if (axios.isAxiosError(error) && !error.response) {
+      throw new Error('無法連線後端，請確認後端服務已啟動（port 8083）')
+    }
+    throw error
+  }
 }
 
 export default http

@@ -35,6 +35,9 @@ export const useAuthStore = defineStore('auth', () => {
   /** 向後端登入並保存 ACCESS_TOKEN */
   async function login(request: LoginRequest) {
     const response = await loginApi(request)
+    if (!response.DATA?.ACCESS_TOKEN) {
+      throw new Error(response.MESSAGE || '登入失敗，未取得 token')
+    }
     applyLoginData(response.DATA)
     return response.DATA
   }

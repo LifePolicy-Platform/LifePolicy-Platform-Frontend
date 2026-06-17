@@ -29,9 +29,14 @@ async function handleLogin() {
     // 登入成功，導向首頁或 redirect 目的地
     const redirect = (router.currentRoute.value.query.redirect as string) || '/'
     router.push(redirect)
-  } catch (e: any) {
-    const msg = e?.response?.data?.message
-      ?? e?.response?.data?.MESSAGE
+  } catch (e: unknown) {
+    const err = e as {
+      message?: string
+      response?: { data?: { message?: string; MESSAGE?: string } }
+    }
+    const msg = err.response?.data?.message
+      ?? err.response?.data?.MESSAGE
+      ?? err.message
       ?? '帳號或密碼錯誤，請重新輸入'
     errorMsg.value = msg
   } finally {

@@ -5,6 +5,7 @@ import {Quasar, Dialog, Notify, ClosePopup, QBanner, QBtn, QCard, QCardSection, 
 import quasarLang from 'quasar/lang/zh-TW'
 import router from './router/index.ts'
 import './style.css'
+import './assets/dashboard.css'
 import App from './App.vue'
 
 import '@quasar/extras/material-icons/material-icons.css'
@@ -19,6 +20,9 @@ app.use(Quasar, {
   config: {
     notify: {
       badgeStyle: 'display: none',
+    },
+    brand: {
+      primary: '#48bb78',
     },
   },
   components: {

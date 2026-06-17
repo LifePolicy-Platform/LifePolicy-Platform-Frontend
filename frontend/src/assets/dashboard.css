@@ -1,0 +1,16 @@
+/* Dashboard 共用設計 token */
+.home-page,
+.dashboard-card {
+  --dash-green: #48bb78;
+  --dash-green-dark: #38a169;
+  --dash-green-deep: #2f855a;
+  --dash-green-soft: #f0fff4;
+  --dash-charcoal: #1a202c;
+  --dash-text: #2d3748;
+  --dash-muted: #718096;
+  --dash-border: #e2e8f0;
+  --dash-bg: #f7fafc;
+  --dash-surface: #ffffff;
+  --dash-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+  --dash-radius: 8px;
+}
