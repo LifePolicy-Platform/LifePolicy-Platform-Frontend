@@ -1,9 +1,16 @@
-<!-- <script setup lang="ts">
+<script setup lang="ts">
 import { ref, reactive, computed } from 'vue'
 import { useQuasar } from 'quasar'
-import { useAuthStore } from '../stores/auth'
-
+import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
+import type { ProductListItem } from '@/types/productMgmt'
+import type { PolicyRecord } from '@/types/policyApplication'
+import {
+  createPolicyApplication,
+  queryPolicyApplications,
+  updatePolicyApplication,
+  reviewPolicyApplication,
+} from '@/api/policyApplication'
 
 const router = useRouter()
 const $q = useQuasar()
@@ -12,9 +19,9 @@ const authStore = useAuthStore()
 // ---- 商品清單 ----
 // 原本 JSP 是後端塞 ${products}，這裡先用常數。若後端有商品 API，改成 onMounted 時呼叫。
 const products = ref<ProductListItem[]>([
-  { code: 'LIFE001', name: '安心終身壽險', minInsuredAge: 0, maxInsuredAge: 70, minSumInsured: 100000, maxSumInsured: 5000000 },
-  { code: 'LIFE002', name: '定期壽險', minInsuredAge: 18, maxInsuredAge: 65, minSumInsured: 500000, maxSumInsured: 10000000 },
-  { code: 'HEALTH001', name: '醫療健康險', minInsuredAge: 0, maxInsuredAge: 75, minSumInsured: 50000, maxSumInsured: 3000000 }
+  { code: 'LIFE001', name: '安心終身壽險', productType: 'life', status: 'active', minInsuredAge: 0, maxInsuredAge: 70, minSumInsured: 100000, maxSumInsured: 5000000, createdAt: '2024-01-01' },
+  { code: 'LIFE002', name: '定期壽險', productType: 'life', status: 'active', minInsuredAge: 18, maxInsuredAge: 65, minSumInsured: 500000, maxSumInsured: 10000000, createdAt: '2024-01-01' },
+  { code: 'HEALTH001', name: '醫療健康險', productType: 'health', status: 'active', minInsuredAge: 0, maxInsuredAge: 75, minSumInsured: 50000, maxSumInsured: 3000000, createdAt: '2024-01-01' }
 ])
 
 // ---- q-select 用的選項 ----
@@ -56,10 +63,13 @@ const productFilterOptions = computed(() => [
 type TabKey = 'create' | 'query' | 'edit' | 'review'
 const activeTab = ref<TabKey>('create')
 
-const canCreate = computed(() => authStore.is)
+const canCreate = computed(() => authStore.isAuthenticated && authStore.roles.includes('APPLICANT'))
 const canQuery = computed(() => authStore.isAuthenticated)
-const canEdit = computed(() => authStore.isApplicant)
-const canReview = computed(() => authStore.isReviewer)
+const canEdit = computed(() => authStore.roles.includes('APPLICANT'))
+const canReview = computed(() => authStore.roles.includes('REVIEWER'))
+const displayName = computed(
+  () => authStore.currentUser?.DISPLAY_NAME ?? authStore.currentUser?.USERNAME ?? '',
+)
 
 // ---- 訊息（改用 Quasar 的 notify）----
 function notifySuccess(msg: string) {
@@ -367,10 +377,10 @@ function loadRecordToReview(record: PolicyRecord) {
 }
 
 function canEditRow(record: PolicyRecord): boolean {
-  return authStore.isApplicant && record.APPLICATION_STATUS === 'PENDING'
+  return canEdit.value && record.APPLICATION_STATUS === 'PENDING'
 }
 function canReviewRow(record: PolicyRecord): boolean {
-  return authStore.isReviewer && record.APPLICATION_STATUS === 'PENDING'
+  return canReview.value && record.APPLICATION_STATUS === 'PENDING'
 }
 
 // ---- 修改 ----
@@ -468,7 +478,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
       <q-card flat class="hero-side-card">
         <div class="text-h6 q-mb-sm">目前身分</div>
         <div v-if="authStore.isAuthenticated">
-          {{ authStore.displayName }}
+          {{ displayName }}
           <q-chip v-for="role in authStore.roles" :key="role" dense size="sm" color="amber-7" text-color="white">
             {{ role }}
           </q-chip>
@@ -683,7 +693,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   <q-input v-model="reviewForm.applicationId" label="申請編號" outlined dense readonly />
                   <div class="identity-tile">
                     <div class="text-caption text-grey-7">審核人員</div>
-                    <div class="text-weight-bold">{{ authStore.displayName }}</div>
+                    <div class="text-weight-bold">{{ displayName }}</div>
                   </div>
                   <q-select v-model="reviewForm.targetStatus" label="目標狀態" outlined dense :options="targetStatusOptions" emit-value map-options />
                   <q-input
@@ -888,4 +898,4 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
   padding: 0;
   min-height: auto;
 }
-</style> -->
+</style>
