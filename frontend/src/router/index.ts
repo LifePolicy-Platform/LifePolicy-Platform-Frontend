@@ -150,7 +150,7 @@ const router = createRouter({
       path: '/users',
       name: 'users',
       component: UsersView,
-      meta: { title: '使用者管理', description: '使用者管理' },
+      meta: { title: '使用者管理', label: '使用者權限管理', requiresAuth: true },
     },
     {
       path: '/workbench',

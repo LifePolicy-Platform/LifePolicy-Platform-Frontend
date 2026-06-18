@@ -5,17 +5,26 @@ import AppFooter from './components/AppFooter.vue'
 import AppHeader from './components/AppHeader.vue'
 import AppSidebar from './components/AppSidebar.vue'
 import { sidebarNavItems } from './constants/navigation'
+import { useAuthStore } from './stores/auth'
 
 const route = useRoute()
+const authStore = useAuthStore()
 
 const activeTopicLabel = computed(() => route.meta.label ?? '未命名主題')
 const hideSidebar = computed(() => route.meta.hideSidebar === true)
 const hasTopHero = computed(() => route.meta.hasTopHero === true)
+
+const visibleNavItems = computed(() =>
+  sidebarNavItems.filter(item => {
+    if (!item.roles || item.roles.length === 0) return true
+    return item.roles.some(role => authStore.roles.includes(role))
+  })
+)
 </script>
 
 <template>
   <div class="app-layout" :class="{ 'app-layout--no-sidebar': hideSidebar }">
-    <AppSidebar v-if="!hideSidebar" :items="sidebarNavItems" />
+    <AppSidebar v-if="!hideSidebar" :items="visibleNavItems" />
 
     <div class="app-shell" :class="{ 'app-shell--hero': hasTopHero }">
       <AppHeader v-if="!hideSidebar" :class="{ 'app-header--overlay': hasTopHero }" />

@@ -8,26 +8,25 @@ export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref<string | null>(getLocalStorageToken())
   const currentUser = ref<CurrentUser | null>(null)
   const isAuthenticated = computed(() => Boolean(accessToken.value))
-  const roles = computed(() => currentUser.value?.ROLES ?? [])
+  const roles = computed(() =>
+    currentUser.value?.ROLE_CODE ? [currentUser.value.ROLE_CODE] : []
+  )
 
-  function applyLoginData(
-    data: {
+  function applyLoginData(data: {
     ACCESS_TOKEN: string
     USERNAME: string
     DISPLAY_NAME: string
-    ROLES: string[]
-  })
-  {
+    ROLE_CODE: string
+  }) {
     setLocalStorageToken(data.ACCESS_TOKEN)
     accessToken.value = data.ACCESS_TOKEN
     currentUser.value = {
       USERNAME: data.USERNAME,
       DISPLAY_NAME: data.DISPLAY_NAME,
-      ROLES: data.ROLES,
+      ROLE_CODE: data.ROLE_CODE,
     }
   }
 
-  /** 向後端登入並保存 ACCESS_TOKEN */
   async function login(request: LoginRequest) {
     const response = await loginApi(request)
     if (!response.DATA?.ACCESS_TOKEN) {
@@ -37,7 +36,6 @@ export const useAuthStore = defineStore('auth', () => {
     return response.DATA
   }
 
-  /** 重新整理頁面時，用 token 向後端 /me */
   async function hydrateFromBackend() {
     if (!accessToken.value) {
       currentUser.value = null
