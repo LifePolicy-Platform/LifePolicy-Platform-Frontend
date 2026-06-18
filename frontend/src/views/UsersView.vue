@@ -89,7 +89,8 @@ async function handleSubmit() {
     closeForm()
     await loadUsers()
   } catch (error: any) {
-    errorMessage.value = error.response?.data?.MESSAGE || '操作失敗'
+    const data = error.response?.data
+    errorMessage.value = data?.MESSAGE ?? data?.message ?? '操作失敗'
   } finally {
     submitting.value = false
   }
@@ -107,8 +108,9 @@ async function toggleUser(user: User) {
     })
     await loadUsers()
     successMessage.value = `使用者 ${user.USERNAME} 已${newStatus === 'ACTIVE' ? '啟用' : '停用'}`
-  } catch {
-    errorMessage.value = '操作失敗'
+  } catch (error: any) {
+    const data = error.response?.data
+    errorMessage.value = data?.MESSAGE ?? data?.message ?? '操作失敗'
   }
 }
 
@@ -137,7 +139,8 @@ async function confirmDelete() {
     deleteTarget.value = null
     await loadUsers()
   } catch (error: any) {
-    errorMessage.value = error.response?.data?.MESSAGE || '刪除失敗'
+    const data = error.response?.data
+    errorMessage.value = data?.MESSAGE ?? data?.message ?? '刪除失敗'
   } finally {
     submitting.value = false
   }
@@ -219,9 +222,6 @@ onMounted(() => {
                   <button class="action-button" @click="openEdit(user)">修改</button>
                   <button class="action-button" @click="toggleUser(user)">
                     {{ user.STATUS === 'ACTIVE' ? '停用' : '啟用' }}
-                  </button>
-                  <button class="action-button danger" @click="openDeleteConfirm(user)">
-                    刪除
                   </button>
                 </div>
               </td>

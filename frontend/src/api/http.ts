@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/auth'
 import router from '@/router/index'
 
 
-const TOKEN_KEY = 'insuranceWorkbenchAccessToken'
+const TOKEN_KEY = 'Token'
 
 declare module 'axios' {
   export interface AxiosRequestConfig {

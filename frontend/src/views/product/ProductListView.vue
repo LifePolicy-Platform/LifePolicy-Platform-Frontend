@@ -9,14 +9,14 @@ import {
 } from '@/constants/product'
 import type { ProductStatus, ProductType } from '@/types/productMgmt'
 
-const { filter, list, isSearching, hasSearched, search, resetFilter } = useProductList()
+const { filter, list, isSearching, hasSearched, errorMessage, search, resetFilter } = useProductList()
 
 function productTypeLabel(type: ProductType) {
-  return PRODUCT_TYPE_LABEL[type]
+  return PRODUCT_TYPE_LABEL[type] ?? type
 }
 
 function productStatusLabel(status: ProductStatus) {
-  return PRODUCT_STATUS_LABEL[status]
+  return PRODUCT_STATUS_LABEL[status] ?? status
 }
 
 const columns = [
@@ -38,7 +38,13 @@ const columns = [
     align: 'right' as const,
     format: (v: number) => v.toLocaleString(),
   },
-  { name: 'createdAt', label: '建立日', field: 'createdAt', align: 'left' as const },
+  {
+    name: 'createTime',
+    label: '建立日',
+    field: 'createTime',
+    align: 'left' as const,
+    format: (v: string) => v ? v.slice(0, 16).replace('T', ' ') : '',
+  },
 ]
 
 const typeOptions = [{ label: '全部', value: '' }, ...PRODUCT_TYPE_OPTIONS]
@@ -47,10 +53,7 @@ const statusOptions = [{ label: '全部', value: '' }, ...PRODUCT_STATUS_OPTIONS
 
 <template>
   <section class="page-with-hero">
-    <PageHero
-      title="商品管理"
-      subtitle="查詢商品列表（類型／狀態欄位為 mock，待 DB 補上）"
-    />
+    <PageHero title="商品管理" subtitle="查詢商品列表" />
 
     <div class="page-body">
       <q-card flat class="page-card q-mb-md">
@@ -67,10 +70,7 @@ const statusOptions = [{ label: '全部', value: '' }, ...PRODUCT_STATUS_OPTIONS
                 v-model="filter.productType"
                 :options="typeOptions"
                 label="類型"
-                dense
-                outlined
-                emit-value
-                map-options
+                dense outlined emit-value map-options
               />
             </div>
             <div class="col-12 col-md-2">
@@ -78,10 +78,7 @@ const statusOptions = [{ label: '全部', value: '' }, ...PRODUCT_STATUS_OPTIONS
                 v-model="filter.status"
                 :options="statusOptions"
                 label="狀態"
-                dense
-                outlined
-                emit-value
-                map-options
+                dense outlined emit-value map-options
               />
             </div>
             <div class="col-12 col-md-2 flex q-gutter-sm">
@@ -92,25 +89,32 @@ const statusOptions = [{ label: '全部', value: '' }, ...PRODUCT_STATUS_OPTIONS
         </q-card-section>
       </q-card>
 
-      <q-card v-if="hasSearched" flat class="page-card">
+      <q-banner v-if="errorMessage" rounded class="bg-red-1 text-red-8 q-mb-md">
+        {{ errorMessage }}
+      </q-banner>
+
+      <q-card v-if="hasSearched && !errorMessage" flat class="page-card">
         <q-card-section>
           <q-table
             :rows="list"
             :columns="columns"
             row-key="code"
-            flat
-            bordered
+            flat bordered
             :loading="isSearching"
             no-data-label="查無商品"
           >
             <template #body-cell-productType="props">
-              <q-td :props="props">
-                {{ productTypeLabel(props.row.productType) }}
-              </q-td>
+              <q-td :props="props">{{ productTypeLabel(props.row.productType) }}</q-td>
             </template>
             <template #body-cell-status="props">
               <q-td :props="props">
-                {{ productStatusLabel(props.row.status) }}
+                <q-chip
+                  dense size="sm"
+                  :color="props.row.status === 'ACTIVE' ? 'positive' : 'grey'"
+                  text-color="white"
+                >
+                  {{ productStatusLabel(props.row.status) }}
+                </q-chip>
               </q-td>
             </template>
           </q-table>

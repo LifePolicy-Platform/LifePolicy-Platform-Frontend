@@ -34,6 +34,8 @@ declare module 'vue-router' {
     hideSidebar?: boolean
     /** true = 主內容區頂部為 Notus 大綠色區塊（Header 透明疊在上面） */
     hasTopHero?: boolean
+    /** 指定角色才能進入（e.g. 'ADMIN'），需搭配 requiresAuth: true */
+    requiresRole?: string
   }
 }
 
@@ -140,17 +142,17 @@ const router = createRouter({
       component: ProductDetailView,
       meta: { title: '商品詳情', description: '單一商品數量與金額試算' },
     },
-    // {
-    //   path: '/workbench',
-    //   name: 'workbench',
-    //   component: Workbench,
-    //   meta: { title: '保單', description: '保單' },
-    // },
+     {
+       path: '/workbench',
+       name: 'workbench',
+       component: Workbench,
+       meta: { title: '保單', description: '保單' },
+     },
     {
       path: '/users',
       name: 'users',
       component: UsersView,
-      meta: { title: '使用者管理', description: '使用者管理' },
+      meta: { title: '使用者管理', label: '使用者權限管理', requiresAuth: true, requiresRole: 'ADMIN' },
     },
     {
       path: '/workbench',
@@ -166,6 +168,8 @@ const router = createRouter({
     }
   ],
 })
+
+
 
 setupRouterGuards(router)
 
