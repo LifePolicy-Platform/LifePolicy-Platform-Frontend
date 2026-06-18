@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useAuthStore } from '@/stores/auth'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import type { ProductListItem } from '@/types/productMgmt'
 import type { PolicyRecord } from '@/types/policyApplication'
 import {
@@ -13,6 +13,7 @@ import {
 } from '@/api/policyApplication'
 
 const router = useRouter()
+const route = useRoute()
 const $q = useQuasar()
 const authStore = useAuthStore()
 
@@ -61,7 +62,22 @@ const productFilterOptions = computed(() => [
 
 // ---- 分頁 ----
 type TabKey = 'create' | 'query' | 'edit' | 'review'
+const tabKeys: TabKey[] = ['create', 'query', 'edit', 'review']
 const activeTab = ref<TabKey>('create')
+
+function isTabKey(value: unknown): value is TabKey {
+  return typeof value === 'string' && tabKeys.includes(value as TabKey)
+}
+
+onMounted(() => {
+  if (isTabKey(route.query.tab)) activeTab.value = route.query.tab
+})
+
+watch(activeTab, (tab) => {
+  if (route.query.tab !== tab) {
+    router.replace({ query: { ...route.query, tab } })
+  }
+})
 
 const canCreate = computed(() => authStore.isAuthenticated && authStore.roles.includes('APPLICANT'))
 const canQuery = computed(() => authStore.isAuthenticated)
@@ -465,65 +481,79 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
 </script>
 
 <template>
-  <div class="page-shell">
-    <!-- Header -->
-    <q-card flat class="hero-panel">
-      <div class="hero-main">
-        <p class="eyebrow">Financial Life Insurance</p>
-        <h1>投保申請作業工作台</h1>
-        <p class="hero-copy">
-          同一頁完成新增、查詢、修改、審核，並即時呈現保費比例、風險等級、缺件提醒與重複投保預警。
-        </p>
+  <section class="page-with-hero workbench-page">
+    <header class="page-hero workbench-hero">
+      <div class="page-hero__blobs" aria-hidden="true">
+        <span class="page-hero__blob page-hero__blob--1" />
+        <span class="page-hero__blob page-hero__blob--2" />
+        <span class="page-hero__blob page-hero__blob--3" />
       </div>
-      <q-card flat class="hero-side-card">
-        <div class="text-h6 q-mb-sm">目前身分</div>
-        <div v-if="authStore.isAuthenticated">
-          {{ displayName }}
-          <q-chip v-for="role in authStore.roles" :key="role" dense size="sm" color="amber-7" text-color="white">
-            {{ role }}
-          </q-chip>
-          <br />
-          <q-btn
-            flat
-            no-caps
-            label="返回工作台"
-            to="/dashboard"
-            class="back-link-btn"
-          />
+      <div class="page-hero__inner workbench-hero__grid">
+        <div class="workbench-hero__copy">
+          <p class="workbench-eyebrow">Financial Life Insurance</p>
+          <h2 class="page-hero__title">投保申請作業工作台</h2>
+          <p class="page-hero__subtitle">
+            同一頁完成新增、查詢、修改、審核，並即時呈現保費比例、風險等級、缺件提醒與重複投保預警。
+          </p>
         </div>
-        <div v-else>尚未登入，請先登入後再操作。</div>
+
+        <q-card flat class="page-hero-card workbench-identity-card">
+          <q-card-section>
+            <div class="text-subtitle2 text-weight-bold q-mb-sm">目前身分</div>
+            <template v-if="authStore.isAuthenticated">
+              <div class="text-h6 text-weight-medium q-mb-xs">{{ displayName }}</div>
+              <div class="q-gutter-xs q-mb-md">
+                <q-chip
+                  v-for="role in authStore.roles"
+                  :key="role"
+                  dense
+                  size="sm"
+                  color="primary"
+                  text-color="white"
+                >
+                  {{ role }}
+                </q-chip>
+              </div>
+              <q-btn flat no-caps color="primary" label="返回 Dashboard" to="/dashboard" icon="dashboard" />
+            </template>
+            <div v-else class="text-body2 text-grey-7">尚未登入，請先登入後再操作。</div>
+          </q-card-section>
+        </q-card>
+      </div>
+    </header>
+
+    <div class="page-body workbench-body">
+      <q-card flat class="page-tab-card workbench-tab-card">
+        <q-tabs
+          v-model="activeTab"
+          align="left"
+          dense
+          no-caps
+          active-color="primary"
+          indicator-color="primary"
+          class="workbench-tabs text-grey-7"
+        >
+          <q-tab name="create" icon="add_circle_outline" label="新增申請" />
+          <q-tab name="query" icon="search" label="查詢案件" />
+          <q-tab name="edit" icon="edit_note" label="修改案件" />
+          <q-tab name="review" icon="fact_check" label="審核案件" />
+        </q-tabs>
+        <q-separator />
       </q-card>
-    </q-card>
 
-    <!-- 分頁 -->
-    <q-card flat class="tab-card">
-      <q-tabs
-        v-model="activeTab"
-        align="left"
-        active-color="teal-9"
-        indicator-color="teal-9"
-        class="text-grey-7"
-        no-caps
-      >
-        <q-tab name="create" label="新增申請" />
-        <q-tab name="query" label="查詢案件" />
-        <q-tab name="edit" label="修改案件" />
-        <q-tab name="review" label="審核案件" />
-      </q-tabs>
-    </q-card>
-
-    <div class="workspace-grid">
-      <div class="main-column">
-        <q-tab-panels v-model="activeTab" animated class="transparent-panels">
+      <div class="workbench-grid">
+        <div class="workbench-main">
+          <q-tab-panels v-model="activeTab" animated class="workbench-panels bg-transparent">
           <!-- 新增 -->
           <q-tab-panel name="create" class="q-pa-none">
-            <q-card flat class="content-card">
-              <div class="panel-header">
+            <q-card flat class="page-card workbench-panel">
+              <q-card-section>
+              <div class="page-card__header">
                 <div>
-                  <p class="panel-kicker">POL_APP_CMD</p>
-                  <div class="text-h6">新增投保申請</div>
+                  <p class="page-card__kicker">POL_APP_CMD</p>
+                  <div class="page-card__title">新增投保申請</div>
                 </div>
-                <q-btn outline color="brown-6" label="檢查重複投保" no-caps @click="runDuplicateCheck(createForm, null)" />
+                <q-btn outline color="primary" label="檢查重複投保" no-caps icon="warning_amber" @click="runDuplicateCheck(createForm, null)" />
               </div>
 
               <q-banner v-if="!canCreate" rounded class="bg-amber-1 text-brown-8 q-mt-md">
@@ -547,19 +577,21 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   <q-input v-model="createForm.contactPhone" label="聯絡電話" outlined dense maxlength="10" />
                 </div>
                 <div class="q-mt-md">
-                  <q-btn color="teal-9" unelevated rounded label="送出新增" no-caps :loading="submitting" @click="handleCreate" />
+                  <q-btn color="primary" unelevated label="送出新增" no-caps icon="send" :loading="submitting" @click="handleCreate" />
                 </div>
               </template>
+              </q-card-section>
             </q-card>
           </q-tab-panel>
 
           <!-- 查詢 -->
           <q-tab-panel name="query" class="q-pa-none">
-            <q-card flat class="content-card">
-              <div class="panel-header">
+            <q-card flat class="page-card workbench-panel">
+              <q-card-section>
+              <div class="page-card__header">
                 <div>
-                  <p class="panel-kicker">POL_APP_QRY</p>
-                  <div class="text-h6">查詢投保申請</div>
+                  <p class="page-card__kicker">POL_APP_QRY</p>
+                  <div class="page-card__title">查詢投保申請</div>
                 </div>
               </div>
 
@@ -581,14 +613,15 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   <q-input v-model.number="queryForm.pageSize" label="筆數" outlined dense type="number" />
                 </div>
                 <div class="q-mt-md q-gutter-sm">
-                  <q-btn color="teal-9" unelevated rounded label="執行查詢" no-caps :loading="submitting" @click="handleQuery" />
-                  <q-btn outline color="brown-6" rounded label="清空條件" no-caps @click="resetQuery" />
+                  <q-btn color="primary" unelevated label="執行查詢" no-caps icon="search" :loading="submitting" @click="handleQuery" />
+                  <q-btn outline color="primary" label="清空條件" no-caps icon="refresh" @click="resetQuery" />
                 </div>
 
                 <q-table
-                  class="q-mt-md"
+                  class="q-mt-md workbench-table app-table"
                   flat
                   bordered
+                  dense
                   :rows="queryResults"
                   :columns="columns"
                   row-key="APPLICATION_ID"
@@ -624,8 +657,8 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   <template #body-cell-actions="props">
                     <q-td :props="props">
                       <div class="q-gutter-xs">
-                        <q-btn v-if="canEditRow(props.row)" size="sm" dense color="teal-7" label="帶入修改" no-caps @click="loadRecordToEdit(props.row)" />
-                        <q-btn v-if="canReviewRow(props.row)" size="sm" dense color="indigo-7" label="帶入審核" no-caps @click="loadRecordToReview(props.row)" />
+                        <q-btn v-if="canEditRow(props.row)" size="sm" dense color="primary" label="帶入修改" no-caps @click="loadRecordToEdit(props.row)" />
+                        <q-btn v-if="canReviewRow(props.row)" size="sm" dense outline color="primary" label="帶入審核" no-caps @click="loadRecordToReview(props.row)" />
                         <span v-if="!canEditRow(props.row) && !canReviewRow(props.row)" class="text-grey-6">無可用操作</span>
                       </div>
                     </q-td>
@@ -633,18 +666,20 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                 </q-table>
                 <div class="text-caption text-grey-6 q-mt-sm">{{ queryMeta }}</div>
               </template>
+              </q-card-section>
             </q-card>
           </q-tab-panel>
 
           <!-- 修改 -->
           <q-tab-panel name="edit" class="q-pa-none">
-            <q-card flat class="content-card">
-              <div class="panel-header">
+            <q-card flat class="page-card workbench-panel">
+              <q-card-section>
+              <div class="page-card__header">
                 <div>
-                  <p class="panel-kicker">POL_APP_UPD</p>
-                  <div class="text-h6">修改 PENDING 案件</div>
+                  <p class="page-card__kicker">POL_APP_UPD</p>
+                  <div class="page-card__title">修改 PENDING 案件</div>
                 </div>
-                <q-btn outline color="brown-6" label="檢查重複投保" no-caps @click="runDuplicateCheck(editForm, editForm.applicationId)" />
+                <q-btn outline color="primary" label="檢查重複投保" no-caps icon="warning_amber" @click="runDuplicateCheck(editForm, editForm.applicationId)" />
               </div>
 
               <q-banner v-if="!canEdit" rounded class="bg-amber-1 text-brown-8 q-mt-md">此功能僅開放 APPLICANT 使用。</q-banner>
@@ -669,19 +704,21 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   <q-input v-model="editForm.contactPhone" label="聯絡電話" outlined dense maxlength="10" />
                 </div>
                 <div class="q-mt-md">
-                  <q-btn color="teal-9" unelevated rounded label="送出修改" no-caps :loading="submitting" @click="handleEdit" />
+                  <q-btn color="primary" unelevated label="送出修改" no-caps icon="save" :loading="submitting" @click="handleEdit" />
                 </div>
               </template>
+              </q-card-section>
             </q-card>
           </q-tab-panel>
 
           <!-- 審核 -->
           <q-tab-panel name="review" class="q-pa-none">
-            <q-card flat class="content-card">
-              <div class="panel-header">
+            <q-card flat class="page-card workbench-panel">
+              <q-card-section>
+              <div class="page-card__header">
                 <div>
-                  <p class="panel-kicker">POL_APP_APRV</p>
-                  <div class="text-h6">審核作業</div>
+                  <p class="page-card__kicker">POL_APP_APRV</p>
+                  <div class="page-card__title">審核作業</div>
                 </div>
               </div>
 
@@ -707,136 +744,108 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   />
                 </div>
 
-                <q-card flat bordered class="q-mt-md q-pa-md">
-                  <div class="text-weight-bold q-mb-sm">文件完整性檢核</div>
+                <q-card flat bordered class="q-mt-md q-pa-md workbench-doc-card">
+                  <div class="text-weight-bold q-mb-sm text-primary">文件完整性檢核</div>
                   <q-checkbox v-model="reviewForm.docIdentity" label="身分證明" />
                   <q-checkbox v-model="reviewForm.docProposal" label="要保書" />
                   <q-checkbox v-model="reviewForm.docHealth" label="健康告知" />
                 </q-card>
 
                 <div class="q-mt-md">
-                  <q-btn color="teal-9" unelevated rounded label="送出審核" no-caps :loading="submitting" @click="handleReview" />
+                  <q-btn color="primary" unelevated label="送出審核" no-caps icon="check_circle" :loading="submitting" @click="handleReview" />
                 </div>
               </template>
+              </q-card-section>
             </q-card>
           </q-tab-panel>
         </q-tab-panels>
+        </div>
+
+        <aside class="workbench-aside">
+          <q-card flat class="page-card page-card--accent workbench-insight">
+            <q-card-section>
+              <div class="text-subtitle1 text-weight-bold q-mb-md text-primary">即時規則提示</div>
+              <div class="hint-row"><span class="hint-label">保費比例</span><span>{{ premiumRatioHint }}</span></div>
+              <div class="hint-row"><span class="hint-label">核保風險等級</span><span>{{ riskLevelHint }}</span></div>
+              <div class="hint-row"><span class="hint-label">重複投保預警</span><span>{{ duplicateWarning }}</span></div>
+              <div class="hint-row hint-row--last"><span class="hint-label">文件檢核</span><span>{{ documentHint }}</span></div>
+            </q-card-section>
+          </q-card>
+
+          <q-card flat class="page-card page-card--accent workbench-insight">
+            <q-card-section>
+              <div class="text-subtitle1 text-weight-bold q-mb-md text-primary">商品參考</div>
+              <q-list separator>
+                <q-item v-for="p in products" :key="p.code" class="product-item">
+                  <q-item-section>
+                    <q-item-label class="text-weight-bold">{{ p.code }}</q-item-label>
+                    <q-item-label>{{ p.name }}</q-item-label>
+                    <q-item-label caption>年齡 {{ p.minInsuredAge }}-{{ p.maxInsuredAge }}，保額 {{ p.minSumInsured }}-{{ p.maxSumInsured }}</q-item-label>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </q-card-section>
+          </q-card>
+        </aside>
       </div>
-
-      <!-- 側欄 -->
-      <aside class="insight-column">
-        <q-card flat class="insight-card">
-          <div class="text-h6 q-mb-md">即時規則提示</div>
-          <div class="hint-row"><span class="hint-label">保費比例</span><span>{{ premiumRatioHint }}</span></div>
-          <div class="hint-row"><span class="hint-label">核保風險等級</span><span>{{ riskLevelHint }}</span></div>
-          <div class="hint-row"><span class="hint-label">重複投保預警</span><span>{{ duplicateWarning }}</span></div>
-          <div class="hint-row"><span class="hint-label">文件檢核</span><span>{{ documentHint }}</span></div>
-        </q-card>
-
-        <q-card flat class="insight-card">
-          <div class="text-h6 q-mb-md">商品參考</div>
-          <q-list separator>
-            <q-item v-for="p in products" :key="p.code" class="product-item">
-              <q-item-section>
-                <q-item-label class="text-weight-bold">{{ p.code }}</q-item-label>
-                <q-item-label>{{ p.name }}</q-item-label>
-                <q-item-label caption>年齡 {{ p.minInsuredAge }}-{{ p.maxInsuredAge }}，保額 {{ p.minSumInsured }}-{{ p.maxSumInsured }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </q-card>
-      </aside>
     </div>
-  </div>
+  </section>
 </template>
 
 <style scoped>
-.page-shell {
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 32px 24px 48px;
-  display: grid;
-  gap: 20px;
+.workbench-page {
+  --workbench-accent: #48bb78;
 }
 
-/* Header */
-.hero-panel {
+.workbench-hero__grid {
   display: grid;
-  grid-template-columns: 1.8fr 1fr;
+  grid-template-columns: 1.6fr 1fr;
   gap: 24px;
-  padding: 28px;
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 24px 80px rgba(38, 57, 77, 0.12);
+  align-items: end;
 }
 
-.eyebrow,
-.panel-kicker {
+.workbench-eyebrow {
   margin: 0 0 8px;
   text-transform: uppercase;
-  letter-spacing: 0.16em;
-  color: #876445;
-  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 11px;
   font-weight: 700;
 }
 
-/* 明確壓住 h1，避免 Quasar 的 6rem 把它放大 */
-.hero-panel h1 {
-  margin: 0;
-  font-family: "Noto Serif TC", serif;
-  font-size: 32px;
-  line-height: 1.2;
-  font-weight: 700;
+.workbench-body {
+  max-width: 1320px;
 }
 
-.hero-copy {
-  line-height: 1.75;
-  margin-top: 12px;
+.workbench-tab-card {
+  margin-bottom: 16px;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
-.hero-side-card {
-  padding: 22px;
-  border-radius: 20px;
-  background: linear-gradient(180deg, #172b4d 0%, #10203a 100%);
-  color: #f9f5ef;
+.workbench-tabs :deep(.q-tab) {
+  min-height: 48px;
+  padding: 0 20px;
+  font-weight: 600;
 }
 
-/* 分頁列 */
-.tab-card {
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.82);
-  padding: 4px 12px;
-}
-
-/* 主體：左內容 + 右側欄 */
-.workspace-grid {
+.workbench-grid {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: 1fr 300px;
   gap: 20px;
   align-items: start;
 }
 
-.main-column {
+.workbench-main {
   min-width: 0;
 }
 
-.transparent-panels {
+.workbench-panels {
   background: transparent;
 }
 
-.content-card,
-.insight-card {
-  padding: 28px;
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 18px 50px rgba(45, 62, 80, 0.08);
-}
-
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
+.workbench-panel {
+  border-radius: 12px;
 }
 
 .form-grid {
@@ -853,29 +862,43 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
   display: grid;
   gap: 4px;
   align-content: center;
-  padding: 8px 14px;
-  border-radius: 14px;
-  background: #eef3f7;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #f0fff4;
+  border: 1px solid #c6f6d5;
 }
 
-/* 側欄提示 */
-.insight-column {
+.workbench-aside {
   display: grid;
-  gap: 20px;
+  gap: 16px;
+}
+
+.workbench-insight {
+  border-radius: 12px;
+  border-top: 3px solid var(--workbench-accent);
+}
+
+.workbench-doc-card {
+  background: #f7fafc;
 }
 
 .hint-row {
   display: grid;
-  gap: 2px;
+  gap: 4px;
   padding: 10px 0;
-  border-bottom: 1px solid #eceff3;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.hint-row--last {
+  border-bottom: none;
 }
 
 .hint-label {
-  font-size: 12px;
-  color: #62707c;
+  font-size: 11px;
+  color: #718096;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  font-weight: 600;
 }
 
 .product-item {
@@ -883,19 +906,15 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
   padding-right: 0;
 }
 
+.workbench-table :deep(thead tr) {
+  background: #f0fff4;
+}
+
 @media (max-width: 1100px) {
-  .hero-panel,
-  .workspace-grid,
+  .workbench-hero__grid,
+  .workbench-grid,
   .form-grid {
     grid-template-columns: 1fr;
   }
-}
-
-.back-link-btn {
-  color: #f4b860;
-  text-decoration: underline;
-  font-weight: 700;
-  padding: 0;
-  min-height: auto;
 }
 </style>

@@ -3,9 +3,6 @@ import { setupRouterGuards } from './guards'
 import HomeView from '../views/HomeView.vue'
 import MyTasksView from '../views/MyTasksView.vue'
 import PolicyMgmtHubView from '../views/policy/PolicyMgmtHubView.vue'
-import PolicySearchListView from '../views/policy/PolicySearchListView.vue'
-import PolicyCreateView from '../views/policy/PolicyCreateView.vue'
-import PolicyReviewView from '../views/policy/PolicyReviewView.vue'
 import ProductListView from '../views/product/ProductListView.vue'
 import UpdTime from '../views/UpdTime.vue'
 import PolicySearchView from '../views/PolicySearchView.vue'
@@ -70,21 +67,15 @@ const router = createRouter({
     },
     {
       path: '/policy-mgmt/search',
-      name: 'policy-mgmt-search',
-      component: PolicySearchListView,
-      meta: { title: '保單查詢', label: '保單查詢', hasTopHero: true, requiresAuth: true },
+      redirect: { path: '/workbench', query: { tab: 'query' } },
     },
     {
       path: '/policy-mgmt/create',
-      name: 'policy-mgmt-create',
-      component: PolicyCreateView,
-      meta: { title: '新增保單', label: '新增保單', hasTopHero: true, requiresAuth: true },
+      redirect: { path: '/workbench', query: { tab: 'create' } },
     },
     {
       path: '/policy-mgmt/review',
-      name: 'policy-mgmt-review',
-      component: PolicyReviewView,
-      meta: { title: '審核保單', label: '審核保單', hasTopHero: true, requiresAuth: true },
+      redirect: { path: '/workbench', query: { tab: 'review' } },
     },
     {
       path: '/products',
@@ -102,7 +93,7 @@ const router = createRouter({
       path: '/policies',
       name: 'policies',
       component: PolicySearchView,
-      meta: { title: '保單查詢元件拆分示範', label: '保單查詢練習' },
+      meta: { title: '保單查詢元件拆分示範', label: '保單查詢練習', hasTopHero: true },
     },
     {
       path: '/updTime',
@@ -150,13 +141,13 @@ const router = createRouter({
       path: '/users',
       name: 'users',
       component: UsersView,
-      meta: { title: '使用者管理', description: '使用者管理' },
+      meta: { title: '使用者管理', label: '使用者管理', hasTopHero: true, requiresAuth: true },
     },
     {
       path: '/workbench',
       name: 'workbench',
       component: Workbench,
-      meta: { title: '保單', description: '保單' },
+      meta: { title: '投保申請工作台', label: '投保申請工作台', hasTopHero: true, requiresAuth: true },
     },
   ],
 })
