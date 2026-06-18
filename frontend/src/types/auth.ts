@@ -19,7 +19,7 @@ export interface LoginResponseData {
   EXPIRES_IN: number
   USERNAME: string
   DISPLAY_NAME: string
-  ROLE_CODE: string
+  ROLES: string[]
 }
 
 /** GET /api/v1/auth/me 回應 DATA */
