@@ -34,5 +34,5 @@ export const sidebarNavItems: SidebarNavItem[] = [
   { group: '商品管理', groupOrder: 4, path: '/products', label: '商品維護', title: '商品維護', icon: 'inventory_2' },
 
   // 系統管理
-  { group: '系統管理', groupOrder: 5, path: '/users', label: '使用者權限管理', title: '使用者權限管理', icon: 'admin_panel_settings', roles: ['REVIEWER'] },
+  { group: '系統管理', groupOrder: 5, path: '/users', label: '使用者權限管理', title: '使用者權限管理', icon: 'admin_panel_settings', roles: ['ADMIN'] },
 ]

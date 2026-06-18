@@ -223,9 +223,6 @@ onMounted(() => {
                   <button class="action-button" @click="toggleUser(user)">
                     {{ user.STATUS === 'ACTIVE' ? '停用' : '啟用' }}
                   </button>
-                  <button class="action-button danger" @click="openDeleteConfirm(user)">
-                    刪除
-                  </button>
                 </div>
               </td>
             </tr>

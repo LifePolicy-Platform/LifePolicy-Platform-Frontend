@@ -1,12 +1,31 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { fetchCurrentUserApi, loginApi } from '@/api/auth'
+import { loginApi } from '@/api/auth'
 import { getLocalStorageToken, setLocalStorageToken } from '@/api/http'
 import type { CurrentUser, LoginRequest } from '@/types/auth'
 
+const USER_KEY = 'User'
+
+function getStoredUser(): CurrentUser | null {
+  try {
+    const raw = localStorage.getItem(USER_KEY)
+    return raw ? (JSON.parse(raw) as CurrentUser) : null
+  } catch {
+    return null
+  }
+}
+
+function setStoredUser(user: CurrentUser | null) {
+  if (user) {
+    localStorage.setItem(USER_KEY, JSON.stringify(user))
+  } else {
+    localStorage.removeItem(USER_KEY)
+  }
+}
+
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref<string | null>(getLocalStorageToken())
-  const currentUser = ref<CurrentUser | null>(null)
+  const currentUser = ref<CurrentUser | null>(getStoredUser())
   const isAuthenticated = computed(() => Boolean(accessToken.value))
   const roles = computed(() =>
     currentUser.value?.ROLE_CODE ? [currentUser.value.ROLE_CODE] : []
@@ -18,13 +37,15 @@ export const useAuthStore = defineStore('auth', () => {
     DISPLAY_NAME: string
     ROLE_CODE: string
   }) {
-    setLocalStorageToken(data.ACCESS_TOKEN)
-    accessToken.value = data.ACCESS_TOKEN
-    currentUser.value = {
+    const user: CurrentUser = {
       USERNAME: data.USERNAME,
       DISPLAY_NAME: data.DISPLAY_NAME,
       ROLE_CODE: data.ROLE_CODE,
     }
+    setLocalStorageToken(data.ACCESS_TOKEN)
+    setStoredUser(user)
+    accessToken.value = data.ACCESS_TOKEN
+    currentUser.value = user
   }
 
   async function login(request: LoginRequest) {
@@ -36,22 +57,10 @@ export const useAuthStore = defineStore('auth', () => {
     return response.DATA
   }
 
-  async function hydrateFromBackend() {
-    if (!accessToken.value) {
-      currentUser.value = null
-      return
-    }
-    try {
-      const response = await fetchCurrentUserApi()
-      currentUser.value = response.DATA
-    } catch {
-      logout()
-    }
-  }
-
   function logout() {
     setLocalStorageToken(null)
-    accessToken.value = ''
+    setStoredUser(null)
+    accessToken.value = null
     currentUser.value = null
   }
 
@@ -61,7 +70,6 @@ export const useAuthStore = defineStore('auth', () => {
     roles,
     isAuthenticated,
     login,
-    hydrateFromBackend,
     logout,
   }
 })
