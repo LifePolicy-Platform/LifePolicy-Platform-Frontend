@@ -16,6 +16,7 @@ import TodoListView from '../views/TodoListView.vue'
 import SearchView from '../views/SearchView.vue'
 import ProductDetailView from '../views/ProductDetailView.vue'
 import UsersView from '../views/UsersView.vue'
+import Workbench from '../views/Workbench.vue'
 
 export interface DemoRouteMeta extends Record<string, unknown> {
   shortLabel?: string
@@ -150,6 +151,12 @@ const router = createRouter({
       name: 'users',
       component: UsersView,
       meta: { title: '使用者管理', description: '使用者管理' },
+    },
+    {
+      path: '/workbench',
+      name: 'workbench',
+      component: Workbench,
+      meta: { title: '保單', description: '保單' },
     },
   ],
 })

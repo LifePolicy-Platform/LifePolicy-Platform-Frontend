@@ -26,15 +26,5 @@ export interface LoginResponseData {
 export interface CurrentUser {
   USERNAME: string
   DISPLAY_NAME: string
-  ROLES: string[]
-}
-
-export interface LoginFormValues {
-  username: string
-  password: string
-}
-
-export interface LoginSubmitResult {
-  success: boolean
-  message: string
+  ROLE_CODE: string
 }
