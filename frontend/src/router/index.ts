@@ -142,12 +142,12 @@ const router = createRouter({
       component: ProductDetailView,
       meta: { title: '商品詳情', description: '單一商品數量與金額試算' },
     },
-    // {
-    //   path: '/workbench',
-    //   name: 'workbench',
-    //   component: Workbench,
-    //   meta: { title: '保單', description: '保單' },
-    // },
+     {
+       path: '/workbench',
+       name: 'workbench',
+       component: Workbench,
+       meta: { title: '保單', description: '保單' },
+     },
     {
       path: '/users',
       name: 'users',

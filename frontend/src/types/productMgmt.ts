@@ -1,17 +1,19 @@
-export type ProductStatus = 'active' | 'inactive'
+export type ProductStatus = 'ACTIVE' | 'INACTIVE'
 
-export type ProductType = 'life' | 'health' | 'accident' | 'annuity' | 'travel'
+export type ProductType = 'LIFE' | 'HEALTH' | 'ACCIDENT' | 'ANNUITY' | 'TRAVEL'
 
 export interface ProductListItem {
   code: string
   name: string
   productType: ProductType
-  status: ProductStatus
-  minInsuredAge: number
-  maxInsuredAge: number
+  basePremium: number
   minSumInsured: number
   maxSumInsured: number
-  createdAt: string
+  minInsuredAge: number
+  maxInsuredAge: number
+  status: ProductStatus
+  remark: string | null
+  createTime: string
 }
 
 export interface ProductSearchFilter {
