@@ -2,9 +2,9 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import {
   Quasar, Dialog, Notify, ClosePopup,
-  QBanner, QBtn, QCard, QCardSection, QCheckbox, QChip, QDate, QIcon,
+  QBanner, QBtn, QCard, QCardSection, QCheckbox, QChip, QDate, QDialog, QIcon,
   QImg, QInput, QItem, QItemLabel, QItemSection, QList, QPopupProxy, QRadio,
-  QSelect, QSeparator, QTab, QTable, QPagination, QTabPanel, QTabPanels, QTabs, QTd, QTime, QTr,
+  QSelect, QSeparator, QSpace, QTab, QTable, QPagination, QTabPanel, QTabPanels, QTabs, QTd, QTime, QTr,
 } from 'quasar'
 import quasarLang from 'quasar/lang/zh-TW'
 import router from './router/index.ts'
@@ -30,9 +30,9 @@ app.use(Quasar, {
     },
   },
   components: {
-    QBanner, QBtn, QCard, QCardSection, QCheckbox, QChip, QDate, QIcon, QImg, QInput,
+    QBanner, QBtn, QCard, QCardSection, QCheckbox, QChip, QDate, QDialog, QIcon, QImg, QInput,
     QItem, QItemLabel, QItemSection, QList, QPopupProxy, QRadio,
-    QSelect, QSeparator, QTab, QTable, QPagination, QTabPanel, QTabPanels, QTabs, QTd, QTime, QTr,
+    QSelect, QSeparator, QSpace, QTab, QTable, QPagination, QTabPanel, QTabPanels, QTabs, QTd, QTime, QTr,
   },
   directives: {
     ClosePopup,
