@@ -20,6 +20,10 @@ export interface ClaimModel {
   file01Path?: string
   file02Name?: string
   file02Path?: string
+  memberName?: string;     // 客戶姓名
+  productCode?: string;    // 商品代碼
+  productName?: string;    // 商品名稱
+  agentName?: string;      // 經辦人姓名
 }
 
 /** 查詢清單 */

@@ -28,7 +28,7 @@ export const sidebarNavItems: SidebarNavItem[] = [
 
   // 理賠作業
   { group: '理賠作業', groupOrder: 3, path: '/claim/ClaimManagement', label: '理賠管理', title: '理賠管理', icon: 'receipt_long'},
-  { group: '理賠作業', groupOrder: 3, path: '/claim/review', label: '理賠審核', title: '理賠審核', icon: 'rule'},
+  { group: '理賠作業', groupOrder: 3, path: '/claim/ClaimAuditManager', label: '理賠審核', title: '理賠審核', icon: 'rule'},
 
   // 商品管理
   { group: '商品管理', groupOrder: 4, path: '/products', label: '商品維護', title: '商品維護', icon: 'inventory_2' },
