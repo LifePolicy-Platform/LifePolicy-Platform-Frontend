@@ -29,8 +29,8 @@ const dialogLoading = ref(false)
 const dialogError = ref('')
 
 interface FormState {
-  code: string
-  name: string
+  productCode: string
+  productName: string
   productType: ProductType | ''
   basePremium: number | null
   minAmount: number | null
@@ -43,8 +43,8 @@ interface FormState {
 
 function emptyForm(): FormState {
   return {
-    code: '',
-    name: '',
+    productCode: '',
+    productName: '',
     productType: '',
     basePremium: null,
     minAmount: null,
@@ -66,14 +66,14 @@ function openCreate() {
 }
 
 function openEdit(row: ProductListItem) {
-  form.code = row.code
-  form.name = row.name
+  form.productCode = row.productCode
+  form.productName = row.productName
   form.productType = row.productType
   form.basePremium = row.basePremium
-  form.minAmount = row.minSumInsured
-  form.maxAmount = row.maxSumInsured
-  form.minAge = row.minInsuredAge
-  form.maxAge = row.maxInsuredAge
+  form.minAmount = row.minAmount
+  form.maxAmount = row.maxAmount
+  form.minAge = row.minAge
+  form.maxAge = row.maxAge
   form.status = row.status
   form.remark = row.remark ?? ''
   isEditing.value = true
@@ -86,8 +86,8 @@ async function submitForm() {
   dialogError.value = ''
   try {
     if (isEditing.value) {
-      await updateProduct(form.code, {
-        PRODUCT_NAME: form.name,
+      await updateProduct(form.productCode, {
+        PRODUCT_NAME: form.productName,
         PRODUCT_TYPE: form.productType as string,
         BASE_PREMIUM: form.basePremium!,
         MIN_AMOUNT: form.minAmount!,
@@ -100,8 +100,8 @@ async function submitForm() {
       $q.notify({ type: 'positive', message: '商品已更新' })
     } else {
       await createProduct({
-        PRODUCT_CODE: form.code,
-        PRODUCT_NAME: form.name,
+        PRODUCT_CODE: form.productCode,
+        PRODUCT_NAME: form.productName,
         PRODUCT_TYPE: form.productType as string,
         BASE_PREMIUM: form.basePremium!,
         MIN_AMOUNT: form.minAmount!,
@@ -126,11 +126,11 @@ async function submitForm() {
 async function toggleStatus(row: ProductListItem) {
   try {
     if (row.status === 'ACTIVE') {
-      await deactivateProduct(row.code)
-      $q.notify({ type: 'warning', message: `${row.name} 已停用` })
+      await deactivateProduct(row.productCode)
+      $q.notify({ type: 'warning', message: `${row.productName} 已停用` })
     } else {
-      await activateProduct(row.code)
-      $q.notify({ type: 'positive', message: `${row.name} 已啟用` })
+      await activateProduct(row.productCode)
+      $q.notify({ type: 'positive', message: `${row.productName} 已啟用` })
     }
     await reload()
   } catch (err: unknown) {
@@ -149,23 +149,23 @@ function productStatusLabel(status: ProductStatus) {
 }
 
 const columns = [
-  { name: 'code', label: '商品代碼', field: 'code', align: 'left' as const },
-  { name: 'name', label: '商品名稱', field: 'name', align: 'left' as const },
+  { name: 'productCode', label: '商品代碼', field: 'productCode', align: 'left' as const },
+  { name: 'productName', label: '商品名稱', field: 'productName', align: 'left' as const },
   { name: 'productType', label: '類型', field: 'productType', align: 'left' as const },
   { name: 'status', label: '狀態', field: 'status', align: 'left' as const },
   {
-    name: 'minSumInsured',
+    name: 'minAmount',
     label: '最低保額',
-    field: 'minSumInsured',
+    field: 'minAmount',
     align: 'right' as const,
-    format: (v: number) => v.toLocaleString(),
+    format: (v: number) => v != null ? v.toLocaleString() : '-',
   },
   {
-    name: 'maxSumInsured',
+    name: 'maxAmount',
     label: '最高保額',
-    field: 'maxSumInsured',
+    field: 'maxAmount',
     align: 'right' as const,
-    format: (v: number) => v.toLocaleString(),
+    format: (v: number) => v != null ? v.toLocaleString() : '-',
   },
   {
     name: 'createTime',
@@ -193,10 +193,10 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
         <q-card-section>
           <div class="row q-col-gutter-md items-end">
             <div class="col-12 col-md-3">
-              <q-input v-model="filter.code" label="商品代碼" dense outlined clearable />
+              <q-input v-model="filter.productCode" label="商品代碼" dense outlined clearable />
             </div>
             <div class="col-12 col-md-3">
-              <q-input v-model="filter.name" label="商品名稱" dense outlined clearable />
+              <q-input v-model="filter.productName" label="商品名稱" dense outlined clearable />
             </div>
             <div class="col-12 col-md-2">
               <q-select
@@ -235,7 +235,7 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
           <q-table
             :rows="list"
             :columns="columns"
-            row-key="code"
+            row-key="productCode"
             flat bordered
             :loading="isLoading"
             no-data-label="查無商品"
@@ -283,21 +283,18 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
 
         <q-card-section>
           <div class="row q-col-gutter-md">
-            <!-- 商品代碼（新增時輸入，修改時唯讀） -->
             <div class="col-12 col-sm-6">
               <q-input
-                v-model="form.code"
+                v-model="form.productCode"
                 label="商品代碼 *"
                 dense outlined
                 :readonly="isEditing"
                 :bg-color="isEditing ? 'grey-2' : undefined"
               />
             </div>
-            <!-- 商品名稱 -->
             <div class="col-12 col-sm-6">
-              <q-input v-model="form.name" label="商品名稱 *" dense outlined />
+              <q-input v-model="form.productName" label="商品名稱 *" dense outlined />
             </div>
-            <!-- 類型 -->
             <div class="col-12 col-sm-6">
               <q-select
                 v-model="form.productType"
@@ -306,7 +303,6 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
                 dense outlined emit-value map-options
               />
             </div>
-            <!-- 狀態（修改時才顯示） -->
             <div v-if="isEditing" class="col-12 col-sm-6">
               <q-select
                 v-model="form.status"
@@ -315,56 +311,26 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
                 dense outlined emit-value map-options
               />
             </div>
-            <!-- 基本保費 -->
             <div class="col-12 col-sm-6">
-              <q-input
-                v-model.number="form.basePremium"
-                label="基本保費 *"
-                dense outlined type="number"
-              />
-            </div>
-            <!-- 最低保額 / 最高保額 -->
-            <div class="col-12 col-sm-6">
-              <q-input
-                v-model.number="form.minAmount"
-                label="最低保額 *"
-                dense outlined type="number"
-              />
+              <q-input v-model.number="form.basePremium" label="基本保費 *" dense outlined type="number" />
             </div>
             <div class="col-12 col-sm-6">
-              <q-input
-                v-model.number="form.maxAmount"
-                label="最高保額 *"
-                dense outlined type="number"
-              />
-            </div>
-            <!-- 最低年齡 / 最高年齡 -->
-            <div class="col-12 col-sm-6">
-              <q-input
-                v-model.number="form.minAge"
-                label="最低投保年齡 *"
-                dense outlined type="number"
-              />
+              <q-input v-model.number="form.minAmount" label="最低保額 *" dense outlined type="number" />
             </div>
             <div class="col-12 col-sm-6">
-              <q-input
-                v-model.number="form.maxAge"
-                label="最高投保年齡 *"
-                dense outlined type="number"
-              />
+              <q-input v-model.number="form.maxAmount" label="最高保額 *" dense outlined type="number" />
             </div>
-            <!-- 備註 -->
+            <div class="col-12 col-sm-6">
+              <q-input v-model.number="form.minAge" label="最低投保年齡 *" dense outlined type="number" />
+            </div>
+            <div class="col-12 col-sm-6">
+              <q-input v-model.number="form.maxAge" label="最高投保年齡 *" dense outlined type="number" />
+            </div>
             <div class="col-12">
-              <q-input
-                v-model="form.remark"
-                label="備註"
-                dense outlined type="textarea"
-                :rows="2"
-              />
+              <q-input v-model="form.remark" label="備註" dense outlined type="textarea" :rows="2" />
             </div>
           </div>
 
-          <!-- Dialog 錯誤訊息 -->
           <q-banner v-if="dialogError" rounded class="bg-red-1 text-red-8 q-mt-md">
             {{ dialogError }}
           </q-banner>

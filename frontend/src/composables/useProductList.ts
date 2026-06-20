@@ -3,7 +3,7 @@ import { fetchProducts } from '@/api/product'
 import type { ProductListItem, ProductSearchFilter } from '@/types/productMgmt'
 
 function emptyFilter(): ProductSearchFilter {
-  return { code: '', name: '', productType: '', status: '' }
+  return { productCode: '', productName: '', productType: '', status: '' }
 }
 
 export function useProductList() {
@@ -19,8 +19,8 @@ export function useProductList() {
       const response = await fetchProducts()
       const all = response.DATA
       list.value = all.filter((row) => {
-        if (filter.value.code && !row.code.includes(filter.value.code)) return false
-        if (filter.value.name && !row.name.includes(filter.value.name)) return false
+        if (filter.value.productCode && !row.productCode.includes(filter.value.productCode)) return false
+        if (filter.value.productName && !row.productName.includes(filter.value.productName)) return false
         if (filter.value.productType && row.productType !== filter.value.productType) return false
         if (filter.value.status && row.status !== filter.value.status) return false
         return true
