@@ -5,12 +5,24 @@ import { useAuthStore } from '@/stores/auth'
 import { useRoute, useRouter } from 'vue-router'
 import type { ProductListItem } from '@/types/productMgmt'
 import type { PolicyRecord } from '@/types/policyApplication'
+import type { PolicyHistoryItem } from '@/types/policyMgmt'
+import PolicyHistoryTable from '@/components/policy/PolicyHistoryTable.vue'
 import {
   createPolicyApplication,
   queryPolicyApplications,
   updatePolicyApplication,
   reviewPolicyApplication,
 } from '@/api/policyApplication'
+import { fetchPolicyAprvLogs } from '@/api/policyAprvLog'
+import { fetchActiveProducts } from '@/api/product'
+import {
+  APPLICATION_STATUS_LABEL,
+  applicationStatusColor,
+  applicationStatusLabel,
+  reviewSuccessMessage,
+} from '@/constants/applicationStatus'
+
+type ProductOption = { label: string; value: string }
 
 const router = useRouter()
 const route = useRoute()
@@ -18,12 +30,59 @@ const $q = useQuasar()
 const authStore = useAuthStore()
 
 // ---- 商品清單 ----
-// 原本 JSP 是後端塞 ${products}，這裡先用常數。若後端有商品 API，改成 onMounted 時呼叫。
-const products = ref<ProductListItem[]>([
-  { code: 'LIFE001', name: '安心終身壽險', productType: 'life', status: 'active', minInsuredAge: 0, maxInsuredAge: 70, minSumInsured: 100000, maxSumInsured: 5000000, createdAt: '2024-01-01' },
-  { code: 'LIFE002', name: '定期壽險', productType: 'life', status: 'active', minInsuredAge: 18, maxInsuredAge: 65, minSumInsured: 500000, maxSumInsured: 10000000, createdAt: '2024-01-01' },
-  { code: 'HEALTH001', name: '醫療健康險', productType: 'health', status: 'active', minInsuredAge: 0, maxInsuredAge: 75, minSumInsured: 50000, maxSumInsured: 3000000, createdAt: '2024-01-01' }
-])
+const products = ref<ProductListItem[]>([])
+const createProductOptions = ref<ProductOption[]>([])
+const queryProductOptions = ref<ProductOption[]>([{ label: '全部', value: '' }])
+const editProductOptions = ref<ProductOption[]>([])
+
+function buildProductOptions(includeAll = false): ProductOption[] {
+  const items = products.value.map((p) => ({
+    label: `${p.code} - ${p.name}`,
+    value: p.code,
+  }))
+  return includeAll ? [{ label: '全部', value: '' }, ...items] : items
+}
+
+function filterProductOptions(
+  val: string,
+  update: (callback: () => void) => void,
+  target: 'create' | 'query' | 'edit',
+) {
+  update(() => {
+    const needle = val.trim().toLowerCase()
+    const base = products.value.map((p) => ({
+      label: `${p.code} - ${p.name}`,
+      value: p.code,
+    }))
+    const filtered = !needle
+      ? base
+      : base.filter(
+          (opt) =>
+            opt.label.toLowerCase().includes(needle) ||
+            opt.value.toLowerCase().includes(needle),
+        )
+
+    if (target === 'create') {
+      createProductOptions.value = filtered
+    } else if (target === 'query') {
+      queryProductOptions.value = [{ label: '全部', value: '' }, ...filtered]
+    } else {
+      editProductOptions.value = filtered
+    }
+  })
+}
+
+async function loadProducts() {
+  try {
+    products.value = await fetchActiveProducts()
+    createProductOptions.value = buildProductOptions()
+    queryProductOptions.value = buildProductOptions(true)
+    editProductOptions.value = buildProductOptions()
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '載入商品失敗'
+    notifyError(message)
+  }
+}
 
 // ---- q-select 用的選項 ----
 const genderOptions = [
@@ -39,26 +98,20 @@ const relationshipOptions = [
 ]
 const statusOptions = [
   { label: '全部', value: '' },
-  { label: 'PENDING', value: 'PENDING' },
-  { label: 'APPROVED', value: 'APPROVED' },
-  { label: 'REJECTED', value: 'REJECTED' }
+  { label: APPLICATION_STATUS_LABEL.PENDING, value: 'PENDING' },
+  { label: APPLICATION_STATUS_LABEL.APPROVED, value: 'APPROVED' },
+  { label: APPLICATION_STATUS_LABEL.REJECTED, value: 'REJECTED' },
+  { label: APPLICATION_STATUS_LABEL.SUBMIT, value: 'SUBMIT' },
+  { label: APPLICATION_STATUS_LABEL.RETURN, value: 'RETURN' },
 ]
 const targetStatusOptions = [
-  { label: 'APPROVED', value: 'APPROVED' },
-  { label: 'REJECTED', value: 'REJECTED' }
+  { label: '核准', value: 'APPROVED' },
+  { label: '拒絕', value: 'REJECTED' },
 ]
 const sortOptions = [
-  { label: 'DESC', value: 'DESC' },
-  { label: 'ASC', value: 'ASC' }
+  { label: '由新到舊', value: 'DESC' },
+  { label: '由舊到新', value: 'ASC' }
 ]
-const productOptions = computed(() => [
-  { label: '請選擇商品', value: '' },
-  ...products.value.map((p) => ({ label: `${p.code} - ${p.name}`, value: p.code }))
-])
-const productFilterOptions = computed(() => [
-  { label: '全部', value: '' },
-  ...products.value.map((p) => ({ label: `${p.code} - ${p.name}`, value: p.code }))
-])
 
 // ---- 分頁 ----
 type TabKey = 'create' | 'query' | 'edit' | 'review'
@@ -70,6 +123,7 @@ function isTabKey(value: unknown): value is TabKey {
 }
 
 onMounted(() => {
+  loadProducts()
   if (isTabKey(route.query.tab)) activeTab.value = route.query.tab
 })
 
@@ -153,13 +207,49 @@ const hasQueried = ref(false)
 const columns = [
   { name: 'applicationId', label: '申請編號', field: 'APPLICATION_ID', align: 'left' as const },
   { name: 'applicant', label: '投保人', field: 'APPLICANT_NAME', align: 'left' as const },
-  { name: 'insured', label: '被保險人', field: 'INSURED_NAME', align: 'left' as const },
+  { name: 'insured', label: '被保人', field: 'INSURED_NAME', align: 'left' as const },
   { name: 'product', label: '商品', field: 'PRODUCT_CODE', align: 'left' as const },
   { name: 'status', label: '狀態', field: 'APPLICATION_STATUS', align: 'left' as const },
   { name: 'risk', label: '風險', field: 'RISK_LEVEL', align: 'left' as const },
   { name: 'ratio', label: '保費比例', field: 'PREMIUM_RATIO', align: 'left' as const },
+  { name: 'history', label: '歷程', field: 'history', align: 'left' as const },
   { name: 'actions', label: '操作', field: 'actions', align: 'left' as const }
 ]
+
+const historyDialogOpen = ref(false)
+const historyLoading = ref(false)
+const historyPolicyNo = ref('')
+const historyRows = ref<PolicyHistoryItem[]>([])
+
+function formatAprvLogTime(value?: string | null): string {
+  if (!value) return '—'
+  return value.replace('T', ' ').slice(0, 19)
+}
+
+async function openPolicyHistory(record: PolicyRecord) {
+  const policyNo = record.APPLICATION_ID
+  historyPolicyNo.value = policyNo
+  historyDialogOpen.value = true
+  historyLoading.value = true
+  historyRows.value = []
+  try {
+    const logs = await fetchPolicyAprvLogs(policyNo)
+    historyRows.value = logs.map((log) => ({
+      time: formatAprvLogTime(log.APRV_TIME),
+      eventName: '審核歷程',
+      status: applicationStatusLabel(log.APRV_STATUS),
+      handler: log.DISPLAY_NAME || '—',
+      reason: '',
+      remark: log.APRV_REMARK?.trim() || '—',
+    }))
+  } catch (error: unknown) {
+    const err = error as { response?: { data?: { MESSAGE?: string } } }
+    notifyError(err.response?.data?.MESSAGE || '查詢審核歷程失敗')
+    historyDialogOpen.value = false
+  } finally {
+    historyLoading.value = false
+  }
+}
 
 // ---- 即時提示 ----
 const hintForm = computed(() => (activeTab.value === 'edit' ? editForm : createForm))
@@ -231,13 +321,13 @@ function validateApplication(form: ReturnType<typeof blankApplication>): string[
   const phonePattern = /^09\d{8}$/
 
   if (!idPattern.test(form.applicantIdNo)) errors.push('投保人身分證格式需為 1 個英文字母加 9 碼數字')
-  if (!idPattern.test(form.insuredIdNo)) errors.push('被保險人身分證格式需為 1 個英文字母加 9 碼數字')
+  if (!idPattern.test(form.insuredIdNo)) errors.push('被保人身分證格式需為 1 個英文字母加 9 碼數字')
   if (form.applicantName.trim().length < 2) errors.push('投保人姓名至少需 2 個字')
-  if (form.insuredName.trim().length < 2) errors.push('被保險人姓名至少需 2 個字')
+  if (form.insuredName.trim().length < 2) errors.push('被保人姓名至少需 2 個字')
 
   const today = new Date()
   if (form.applicantBirthdate && new Date(form.applicantBirthdate) > today) errors.push('投保人生日不可晚於今天')
-  if (form.insuredBirthdate && new Date(form.insuredBirthdate) > today) errors.push('被保險人生日不可晚於今天')
+  if (form.insuredBirthdate && new Date(form.insuredBirthdate) > today) errors.push('被保人生日不可晚於今天')
 
   if (!form.productCode) errors.push('請選擇商品代碼')
   if (!phonePattern.test(form.contactPhone)) errors.push('聯絡電話需為 09 開頭的 10 碼手機號碼')
@@ -252,6 +342,10 @@ function validateApplication(form: ReturnType<typeof blankApplication>): string[
 }
 
 function buildPayload(form: ReturnType<typeof blankApplication>) {
+  const sumInsured = Number(form.sumInsured || 0)
+  const annualPremium = Number(form.annualPremium || 0)
+  const premiumRatio = sumInsured > 0 ? annualPremium / sumInsured : 0
+
   return {
     APPLICANT_ID_NO: form.applicantIdNo.trim(),
     APPLICANT_NAME: form.applicantName.trim(),
@@ -263,9 +357,11 @@ function buildPayload(form: ReturnType<typeof blankApplication>) {
     INSURED_GENDER: form.insuredGender,
     INSURED_BIRTHDATE: form.insuredBirthdate,
     PRODUCT_CODE: form.productCode,
-    SUM_INSURED: Number(form.sumInsured),
-    ANNUAL_PREMIUM: Number(form.annualPremium),
-    CONTACT_PHONE: form.contactPhone.trim()
+    SUM_INSURED: sumInsured,
+    ANNUAL_PREMIUM: annualPremium,
+    CONTACT_PHONE: form.contactPhone.trim(),
+    RISK_LEVEL: evaluateRiskLevel(form.insuredBirthdate, form.relationshipToInsured, sumInsured, premiumRatio),
+    CREATED_BY: authStore.currentUser?.USERNAME ?? ''
   }
 }
 
@@ -428,7 +524,7 @@ async function handleReview() {
     return
   }
   if (reviewForm.targetStatus === 'REJECTED' && !reviewForm.rejectionReason.trim()) {
-    notifyError('選擇 REJECTED 時必須填寫拒絕原因')
+    notifyError('選擇「拒絕」時必須填寫拒絕原因')
     return
   }
   if (!areDocumentsConfirmed()) {
@@ -441,9 +537,11 @@ async function handleReview() {
       APPLICATION_ID: reviewForm.applicationId.trim(),
       TARGET_STATUS: reviewForm.targetStatus,
       REJECTION_REASON: reviewForm.rejectionReason.trim() || null,
-      DOCUMENTS_CONFIRMED: areDocumentsConfirmed()
+      DOCUMENTS_CONFIRMED: areDocumentsConfirmed(),
+      REVIEWED_BY: authStore.currentUser?.USERNAME ?? '',
     })
-    notifySuccess(`審核完成，最新狀態 ${result.APPLICATION_STATUS}`)
+    const status = result.CURRENT_STATUS ?? reviewForm.targetStatus
+    notifySuccess(reviewSuccessMessage(status))
   } catch (error: any) {
     notifyError(error.response?.data?.MESSAGE || '審核失敗')
   } finally {
@@ -454,7 +552,7 @@ async function handleReview() {
 // ---- 重複投保檢查 ----
 async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, currentApplicationId: string | null) {
   if (!form.applicantIdNo || !form.insuredIdNo || !form.productCode) {
-    duplicateWarning.value = '請先填妥投保人、被保險人與商品代碼後再檢查'
+    duplicateWarning.value = '請先填妥投保人、被保人與商品代碼後再檢查'
     return
   }
   try {
@@ -473,7 +571,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
       : records
     duplicateWarning.value = duplicates.length
       ? `偵測到 ${duplicates.length} 筆相似 PENDING 申請，送出前請再確認`
-      : '未發現相同投保人/被保險人/商品的 PENDING 申請'
+      : '未發現相同投保人/被保人/商品的 PENDING 申請'
   } catch (error: any) {
     duplicateWarning.value = error.response?.data?.MESSAGE || '檢查失敗'
   }
@@ -567,11 +665,30 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   <q-select v-model="createForm.applicantGender" label="投保人性別" outlined dense :options="genderOptions" emit-value map-options />
                   <q-input v-model="createForm.applicantBirthdate" label="投保人生日" outlined dense type="date" stack-label />
                   <q-select v-model="createForm.relationshipToInsured" label="關係" outlined dense :options="relationshipOptions" emit-value map-options />
-                  <q-input v-model="createForm.insuredIdNo" label="被保險人身分證" outlined dense maxlength="10" />
-                  <q-input v-model="createForm.insuredName" label="被保險人姓名" outlined dense maxlength="50" />
-                  <q-select v-model="createForm.insuredGender" label="被保險人性別" outlined dense :options="genderOptions" emit-value map-options />
-                  <q-input v-model="createForm.insuredBirthdate" label="被保險人生日" outlined dense type="date" stack-label />
-                  <q-select v-model="createForm.productCode" label="商品代碼" outlined dense :options="productOptions" emit-value map-options />
+                  <q-input v-model="createForm.insuredIdNo" label="被保人身分證" outlined dense maxlength="10" />
+                  <q-input v-model="createForm.insuredName" label="被保人姓名" outlined dense maxlength="50" />
+                  <q-select v-model="createForm.insuredGender" label="被保人性別" outlined dense :options="genderOptions" emit-value map-options />
+                  <q-input v-model="createForm.insuredBirthdate" label="被保人生日" outlined dense type="date" stack-label />
+                  <q-select
+                    v-model="createForm.productCode"
+                    label="商品代碼"
+                    outlined
+                    dense
+                    use-input
+                    fill-input
+                    hide-selected
+                    input-debounce="200"
+                    :options="createProductOptions"
+                    emit-value
+                    map-options
+                    @filter="(val, update) => filterProductOptions(val, update, 'create')"
+                  >
+                    <template #no-option>
+                      <q-item>
+                        <q-item-section class="text-grey">查無符合的商品</q-item-section>
+                      </q-item>
+                    </template>
+                  </q-select>
                   <q-input v-model="createForm.sumInsured" label="保額" outlined dense type="number" />
                   <q-input v-model="createForm.annualPremium" label="年繳保費" outlined dense type="number" />
                   <q-input v-model="createForm.contactPhone" label="聯絡電話" outlined dense maxlength="10" />
@@ -603,9 +720,28 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                 <div class="form-grid q-mt-md">
                   <q-input v-model="queryForm.applicationId" label="申請編號" outlined dense />
                   <q-input v-model="queryForm.applicantIdNo" label="投保人身分證" outlined dense />
-                  <q-input v-model="queryForm.insuredIdNo" label="被保險人身分證" outlined dense />
+                  <q-input v-model="queryForm.insuredIdNo" label="被保人身分證" outlined dense />
                   <q-select v-model="queryForm.applicationStatus" label="申請狀態" outlined dense :options="statusOptions" emit-value map-options />
-                  <q-select v-model="queryForm.productCode" label="商品代碼" outlined dense :options="productFilterOptions" emit-value map-options />
+                  <q-select
+                    v-model="queryForm.productCode"
+                    label="商品代碼"
+                    outlined
+                    dense
+                    use-input
+                    fill-input
+                    hide-selected
+                    input-debounce="200"
+                    :options="queryProductOptions"
+                    emit-value
+                    map-options
+                    @filter="(val, update) => filterProductOptions(val, update, 'query')"
+                  >
+                    <template #no-option>
+                      <q-item>
+                        <q-item-section class="text-grey">查無符合的商品</q-item-section>
+                      </q-item>
+                    </template>
+                  </q-select>
                   <q-input v-model="queryForm.submissionStartTime" label="起始時間" outlined dense type="datetime-local" stack-label />
                   <q-input v-model="queryForm.submissionEndTime" label="結束時間" outlined dense type="datetime-local" stack-label />
                   <q-select v-model="queryForm.sortDirection" label="排序方向" outlined dense :options="sortOptions" emit-value map-options />
@@ -631,17 +767,30 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                 >
                   <template #body-cell-applicant="props">
                     <q-td :props="props">
-                      {{ props.row.APPLICANT_NAME }}<br /><small class="text-grey-6">{{ props.row.APPLICANT_ID_NO }}</small>
+                      {{ props.row.APPLICANT_NAME || '—' }}
                     </q-td>
                   </template>
                   <template #body-cell-insured="props">
                     <q-td :props="props">
-                      {{ props.row.INSURED_NAME }}<br /><small class="text-grey-6">{{ props.row.INSURED_ID_NO }}</small>
+                      {{ props.row.INSURED_NAME || '—' }}
                     </q-td>
                   </template>
                   <template #body-cell-product="props">
                     <q-td :props="props">
-                      {{ props.row.PRODUCT_CODE }}<br /><small class="text-grey-6">{{ props.row.PRODUCT_NAME }}</small>
+                      <div>{{ props.row.PRODUCT_NAME || '—' }}</div>
+                      <small class="text-grey-6">{{ props.row.PRODUCT_CODE }}</small>
+                    </q-td>
+                  </template>
+                  <template #body-cell-status="props">
+                    <q-td :props="props">
+                      <q-chip
+                        dense
+                        size="sm"
+                        :color="applicationStatusColor(props.row.APPLICATION_STATUS)"
+                        text-color="white"
+                      >
+                        {{ applicationStatusLabel(props.row.APPLICATION_STATUS) }}
+                      </q-chip>
                     </q-td>
                   </template>
                   <template #body-cell-risk="props">
@@ -653,6 +802,20 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   </template>
                   <template #body-cell-ratio="props">
                     <q-td :props="props">{{ formatRatio(props.row.PREMIUM_RATIO) }}</q-td>
+                  </template>
+                  <template #body-cell-history="props">
+                    <q-td :props="props">
+                      <q-btn
+                        size="sm"
+                        dense
+                        flat
+                        color="primary"
+                        label="歷程"
+                        no-caps
+                        icon="history"
+                        @click="openPolicyHistory(props.row)"
+                      />
+                    </q-td>
                   </template>
                   <template #body-cell-actions="props">
                     <q-td :props="props">
@@ -694,11 +857,30 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   <q-select v-model="editForm.applicantGender" label="投保人性別" outlined dense :options="genderOptions" emit-value map-options />
                   <q-input v-model="editForm.applicantBirthdate" label="投保人生日" outlined dense type="date" stack-label />
                   <q-select v-model="editForm.relationshipToInsured" label="關係" outlined dense :options="relationshipOptions" emit-value map-options />
-                  <q-input v-model="editForm.insuredIdNo" label="被保險人身分證" outlined dense maxlength="10" />
-                  <q-input v-model="editForm.insuredName" label="被保險人姓名" outlined dense maxlength="50" />
-                  <q-select v-model="editForm.insuredGender" label="被保險人性別" outlined dense :options="genderOptions" emit-value map-options />
-                  <q-input v-model="editForm.insuredBirthdate" label="被保險人生日" outlined dense type="date" stack-label />
-                  <q-select v-model="editForm.productCode" label="商品代碼" outlined dense :options="productOptions" emit-value map-options />
+                  <q-input v-model="editForm.insuredIdNo" label="被保人身分證" outlined dense maxlength="10" />
+                  <q-input v-model="editForm.insuredName" label="被保人姓名" outlined dense maxlength="50" />
+                  <q-select v-model="editForm.insuredGender" label="被保人性別" outlined dense :options="genderOptions" emit-value map-options />
+                  <q-input v-model="editForm.insuredBirthdate" label="被保人生日" outlined dense type="date" stack-label />
+                  <q-select
+                    v-model="editForm.productCode"
+                    label="商品代碼"
+                    outlined
+                    dense
+                    use-input
+                    fill-input
+                    hide-selected
+                    input-debounce="200"
+                    :options="editProductOptions"
+                    emit-value
+                    map-options
+                    @filter="(val, update) => filterProductOptions(val, update, 'edit')"
+                  >
+                    <template #no-option>
+                      <q-item>
+                        <q-item-section class="text-grey">查無符合的商品</q-item-section>
+                      </q-item>
+                    </template>
+                  </q-select>
                   <q-input v-model="editForm.sumInsured" label="保額" outlined dense type="number" />
                   <q-input v-model="editForm.annualPremium" label="年繳保費" outlined dense type="number" />
                   <q-input v-model="editForm.contactPhone" label="聯絡電話" outlined dense maxlength="10" />
@@ -740,7 +922,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                     outlined
                     type="textarea"
                     rows="3"
-                    hint="若選擇 REJECTED，請填寫原因"
+                    hint="若選擇「拒絕」，請填寫原因"
                   />
                 </div>
 
@@ -790,11 +972,31 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
       </div>
     </div>
   </section>
+
+  <q-dialog v-model="historyDialogOpen" persistent>
+    <q-card style="min-width: 720px; max-width: 95vw">
+      <q-card-section class="row items-center q-pb-none">
+        <div class="text-h6">審核歷程</div>
+        <q-space />
+        <q-btn icon="close" flat round dense v-close-popup />
+      </q-card-section>
+      <q-card-section class="text-caption text-grey-7 q-pt-none">
+        申請編號：{{ historyPolicyNo }}
+      </q-card-section>
+      <q-card-section>
+        <q-inner-loading :showing="historyLoading">
+          <q-spinner size="40px" color="primary" />
+        </q-inner-loading>
+        <PolicyHistoryTable v-if="!historyLoading" :rows="historyRows" />
+      </q-card-section>
+    </q-card>
+  </q-dialog>
 </template>
 
 <style scoped>
 .workbench-page {
   --workbench-accent: #48bb78;
+  --workbench-aside-width: 240px;
 }
 
 .workbench-hero__grid {
@@ -814,7 +1016,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
 }
 
 .workbench-body {
-  max-width: 1320px;
+  max-width: 1440px;
 }
 
 .workbench-tab-card {
@@ -831,8 +1033,8 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
 
 .workbench-grid {
   display: grid;
-  grid-template-columns: 1fr 300px;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) var(--workbench-aside-width);
+  gap: 16px;
   align-items: start;
 }
 
@@ -870,12 +1072,24 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
 
 .workbench-aside {
   display: grid;
-  gap: 16px;
+  gap: 12px;
+  width: var(--workbench-aside-width);
+  max-width: var(--workbench-aside-width);
+  font-size: 0.875rem;
 }
 
 .workbench-insight {
   border-radius: 12px;
   border-top: 3px solid var(--workbench-accent);
+}
+
+.workbench-insight :deep(.q-card__section) {
+  padding: 12px 14px;
+}
+
+.workbench-insight .text-subtitle1 {
+  font-size: 0.95rem;
+  margin-bottom: 8px;
 }
 
 .workbench-doc-card {
@@ -885,7 +1099,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
 .hint-row {
   display: grid;
   gap: 4px;
-  padding: 10px 0;
+  padding: 8px 0;
   border-bottom: 1px solid #edf2f7;
 }
 
@@ -902,12 +1116,25 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
 }
 
 .product-item {
-  padding-left: 0;
-  padding-right: 0;
+  padding: 6px 0;
+  min-height: auto;
+}
+
+.product-item :deep(.q-item__label) {
+  line-height: 1.35;
 }
 
 .workbench-table :deep(thead tr) {
   background: #f0fff4;
+}
+
+.workbench-table :deep(.q-table tbody td) {
+  font-size: 0.9rem;
+}
+
+.workbench-table :deep(.q-table thead th) {
+  font-size: 0.85rem;
+  font-weight: 700;
 }
 
 @media (max-width: 1100px) {

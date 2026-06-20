@@ -1,3 +1,10 @@
+/** 對應後端 ApiResponse 包裝（/api/products/active） */
+export interface ProductApiResponse {
+  code: number
+  message: string
+  data: ProductListItem[]
+}
+
 export type ProductStatus = 'ACTIVE' | 'INACTIVE'
 
 export type ProductType = 'LIFE' | 'HEALTH' | 'ACCIDENT' | 'ANNUITY' | 'TRAVEL'

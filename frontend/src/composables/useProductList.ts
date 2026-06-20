@@ -20,8 +20,7 @@ export function useProductList() {
     errorMessage.value = ''
     try {
       if (allProducts.value.length === 0) {
-        const response = await fetchProducts()
-        allProducts.value = response.DATA
+        allProducts.value = await fetchProducts()
       }
       list.value = allProducts.value.filter((row) => {
         if (filter.value.code && !row.code.includes(filter.value.code)) return false
