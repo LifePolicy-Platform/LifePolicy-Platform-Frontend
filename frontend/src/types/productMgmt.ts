@@ -31,3 +31,17 @@ export interface ProductSearchFilter {
   productType: ProductType | ''
   status: ProductStatus | ''
 }
+
+export interface ProductListItem1 {
+  code: string
+  name: string
+  productType: ProductType
+  basePremium: number
+  minSumInsured: number
+  maxSumInsured: number
+  minInsuredAge: number
+  maxInsuredAge: number
+  status: ProductStatus
+  remark: string | null
+  createTime: string
+}
