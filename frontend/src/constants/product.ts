@@ -1,16 +1,16 @@
 import type { ProductStatus, ProductType } from '@/types/productMgmt'
 
 export const PRODUCT_TYPE_LABEL: Record<ProductType, string> = {
-  life: '壽險',
-  health: '醫療險',
-  accident: '意外險',
-  annuity: '年金險',
-  travel: '旅平險',
+  LIFE: '壽險',
+  HEALTH: '醫療險',
+  ACCIDENT: '意外險',
+  ANNUITY: '年金險',
+  TRAVEL: '旅平險',
 }
 
 export const PRODUCT_STATUS_LABEL: Record<ProductStatus, string> = {
-  active: '上架',
-  inactive: '下架',
+  ACTIVE: '上架',
+  INACTIVE: '下架',
 }
 
 export const PRODUCT_TYPE_OPTIONS = Object.entries(PRODUCT_TYPE_LABEL).map(

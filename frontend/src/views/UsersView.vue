@@ -92,9 +92,9 @@ async function handleSubmit() {
     }
     closeForm()
     await loadUsers()
-  } catch (error: unknown) {
-    const err = error as { response?: { data?: { MESSAGE?: string } } }
-    errorMessage.value = err.response?.data?.MESSAGE || '操作失敗'
+  } catch (error: any) {
+    const data = error.response?.data
+    errorMessage.value = data?.MESSAGE ?? data?.message ?? '操作失敗'
   } finally {
     submitting.value = false
   }
@@ -111,8 +111,9 @@ async function toggleUser(user: User) {
     })
     await loadUsers()
     successMessage.value = `使用者 ${user.USERNAME} 已${newStatus === 'ACTIVE' ? '啟用' : '停用'}`
-  } catch {
-    errorMessage.value = '操作失敗'
+  } catch (error: any) {
+    const data = error.response?.data
+    errorMessage.value = data?.MESSAGE ?? data?.message ?? '操作失敗'
   }
 }
 
@@ -137,9 +138,9 @@ async function confirmDelete() {
     showDeleteConfirm.value = false
     deleteTarget.value = null
     await loadUsers()
-  } catch (error: unknown) {
-    const err = error as { response?: { data?: { MESSAGE?: string } } }
-    errorMessage.value = err.response?.data?.MESSAGE || '刪除失敗'
+  } catch (error: any) {
+    const data = error.response?.data
+    errorMessage.value = data?.MESSAGE ?? data?.message ?? '刪除失敗'
   } finally {
     submitting.value = false
   }
@@ -173,42 +174,42 @@ onMounted(() => {
             <q-btn color="primary" unelevated icon="person_add" label="新增使用者" no-caps @click="openCreate" />
           </div>
 
-          <q-table
-            class="app-table"
-            :rows="users"
-            :columns="columns"
-            row-key="USERNAME"
-            flat
-            bordered
-            dense
-            :loading="loading"
-            no-data-label="查無使用者"
-          >
-            <template #body-cell-role="props">
-              <q-td :props="props">
-                <q-chip dense size="sm" color="primary" text-color="white">
-                  {{ props.row.ROLE_CODE }}
-                </q-chip>
-              </q-td>
-            </template>
-            <template #body-cell-status="props">
-              <q-td :props="props">
-                <q-chip
-                  dense
-                  size="sm"
-                  :color="props.row.STATUS === 'ACTIVE' ? 'positive' : 'grey-5'"
-                  text-color="white"
-                >
-                  {{ props.row.STATUS === 'ACTIVE' ? '啟用' : '停用' }}
-                </q-chip>
-              </q-td>
-            </template>
-            <template #body-cell-actions="props">
-              <q-td :props="props">
-                <div class="q-gutter-xs">
-                  <q-btn size="sm" dense flat color="primary" label="修改" no-caps @click="openEdit(props.row)" />
-                  <q-btn size="sm" dense flat color="primary" :label="props.row.STATUS === 'ACTIVE' ? '停用' : '啟用'" no-caps @click="toggleUser(props.row)" />
-                  <q-btn size="sm" dense flat color="negative" label="刪除" no-caps @click="openDeleteConfirm(props.row)" />
+      <!-- 載入中 -->
+      <div v-if="loading" class="empty-row">載入中...</div>
+
+      <!-- 表格 -->
+      <div v-else class="table-shell">
+        <table class="result-table">
+          <thead>
+            <tr>
+              <th>帳號</th>
+              <th>顯示名稱</th>
+              <th>角色</th>
+              <th>狀態</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="!users.length">
+              <td colspan="5" class="empty-row">查無使用者</td>
+            </tr>
+            <tr v-for="user in users" :key="user.USERNAME">
+              <td>{{ user.USERNAME }}</td>
+              <td>{{ user.DISPLAY_NAME }}</td>
+              <td>
+                <span class="role-pill">{{ user.ROLE_CODE }}</span>
+              </td>
+              <td>
+                <span :class="user.STATUS === 'ACTIVE' ? 'badge-success' : 'badge-error'">
+                  {{ user.STATUS === 'ACTIVE' ? '啟用' : '停用' }}
+                </span>
+              </td>
+              <td>
+                <div class="inline-actions">
+                  <button class="action-button" @click="openEdit(user)">修改</button>
+                  <button class="action-button" @click="toggleUser(user)">
+                    {{ user.STATUS === 'ACTIVE' ? '停用' : '啟用' }}
+                  </button>
                 </div>
               </q-td>
             </template>

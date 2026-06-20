@@ -26,9 +26,6 @@ function handleClickOutside(event: MouseEvent) {
 }
 
 onMounted(() => {
-  if (authStore.accessToken && !authStore.currentUser) {
-    authStore.hydrateFromBackend()
-  }
   document.addEventListener('click', handleClickOutside)
 })
 
