@@ -1,5 +1,5 @@
-import { requestJson } from '@/api/http'
-import type { ProductListItem } from '@/types/productMgmt'
+import { http, requestJson } from '@/api/http'
+import type { ProductApiResponse, ProductListItem, ProductStatus, ProductType } from '@/types/productMgmt'
 import type { ApiEnvelope } from '@/types/auth'
 
 export interface ProductCreatePayload {

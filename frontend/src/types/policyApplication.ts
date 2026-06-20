@@ -36,5 +36,11 @@ export interface PolicyUpdateResult {
 }
 
 export interface PolicyReviewResult {
-  APPLICATION_STATUS: string
+  APPLICATION_ID?: string
+  PREVIOUS_STATUS?: string
+  CURRENT_STATUS?: string
+  REVIEWED_BY?: string
+  REJECTION_REASON?: string
+  REVIEW_TIME?: string
+  DOCUMENTS_CONFIRMED?: boolean
 }

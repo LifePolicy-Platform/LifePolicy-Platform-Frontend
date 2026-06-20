@@ -12,23 +12,23 @@ import PolicyHubCard from '@/components/policy/PolicyHubCard.vue'
         <PolicyHubCard
           variant="search"
           title="保單查詢"
-          description="查詢保單列表、檢視明細與投保歷程"
+          description="查詢投保申請、帶入修改或審核"
           icon="search"
-          to="/policy-mgmt/search"
+          to="/workbench?tab=query"
         />
         <PolicyHubCard
           variant="create"
           title="新增保單"
-          description="建立新保單申請"
+          description="建立新投保申請"
           icon="note_add"
-          to="/policy-mgmt/create"
+          to="/workbench?tab=create"
         />
         <PolicyHubCard
           variant="review"
           title="審核保單"
-          description="審核待核保件（權限後續實作）"
+          description="審核待核保件（REVIEWER）"
           icon="fact_check"
-          to="/policy-mgmt/review"
+          to="/workbench?tab=review"
         />
       </div>
     </div>

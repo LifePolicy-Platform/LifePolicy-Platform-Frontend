@@ -10,6 +10,7 @@ import quasarLang from 'quasar/lang/zh-TW'
 import router from './router/index.ts'
 import './style.css'
 import './assets/dashboard.css'
+import './assets/page-design.css'
 import App from './App.vue'
 
 import '@quasar/extras/material-icons/material-icons.css'

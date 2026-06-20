@@ -191,6 +191,12 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
       <!-- 篩選列 -->
       <q-card flat class="page-card q-mb-md">
         <q-card-section>
+          <div class="page-card__header q-mb-sm">
+            <div>
+              <p class="page-card__kicker">FILTER</p>
+              <div class="page-card__title">查詢條件</div>
+            </div>
+          </div>
           <div class="row q-col-gutter-md items-end">
             <div class="col-12 col-md-3">
               <q-input v-model="filter.productCode" label="商品代碼" dense outlined clearable />
@@ -232,7 +238,15 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
       <!-- 商品列表 -->
       <q-card flat class="page-card">
         <q-card-section>
+          <div class="page-card__header q-mb-md">
+            <div>
+              <p class="page-card__kicker">PRODUCT LIST</p>
+              <div class="page-card__title">商品清單</div>
+              <p class="page-card__desc">共 {{ list.length }} 筆結果</p>
+            </div>
+          </div>
           <q-table
+            class="app-table"
             :rows="list"
             :columns="columns"
             row-key="productCode"
@@ -241,16 +255,27 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
             no-data-label="查無商品"
           >
             <template #body-cell-productType="props">
-              <q-td :props="props">{{ productTypeLabel(props.row.productType) }}</q-td>
+              <q-td :props="props">
+                <q-chip dense size="sm" color="blue-grey-2" text-color="blue-grey-9">
+                  {{ productTypeLabel(props.row.productType) }}
+                </q-chip>
+              </q-td>
             </template>
             <template #body-cell-status="props">
               <q-td :props="props">
                 <q-chip
                   dense size="sm"
-                  :color="props.row.status === 'ACTIVE' ? 'positive' : 'grey'"
+                  :color="props.row.status === 'active' ? 'positive' : 'grey'"
+                  text-color="white"
+                >
+                  <q-chip
+                  dense
+                  size="sm"
+                  :color="props.row.status === 'active' ? 'positive' : 'grey-5'"
                   text-color="white"
                 >
                   {{ productStatusLabel(props.row.status) }}
+                </q-chip>
                 </q-chip>
               </q-td>
             </template>
