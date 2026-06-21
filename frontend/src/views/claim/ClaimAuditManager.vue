@@ -7,10 +7,27 @@
     <q-card class="q-mb-md flat bordered">
       <q-card-section class="row q-col-gutter-sm items-center">
         <div class="col-12 col-sm-4">
-          <q-select v-model="filters.status" :options="statusOptions" emit-value map-options label="審核狀態篩選" outlined dense clearable />
+          <q-select 
+            v-model="filters.status" 
+            :options="statusOptions" 
+            emit-value 
+            map-options 
+            label="審核狀態篩選" 
+            outlined 
+            dense 
+            clearable 
+            @update:model-value="loadAuditData"
+          />
         </div>
         <div class="col-12 col-sm-4">
-          <q-input v-model="filters.policyNo" label="保單號碼搜尋" outlined dense clearable />
+          <q-input 
+            v-model="filters.policyNo" 
+            label="保單號碼搜尋" 
+            outlined 
+            dense 
+            clearable 
+            @keydown.enter="loadAuditData"
+          />
         </div>
         <div class="col-12 col-sm-4">
           <q-btn color="indigo-7" icon="search" label="查詢審核列表" @click="loadAuditData" />
@@ -29,24 +46,64 @@
 
       <template v-slot:body-cell-actions="props">
         <q-td :props="props" class="q-gutter-xs">
-          <q-btn size="sm" color="indigo" icon="gavel" label="進入審核關卡" @click="openAuditDialog(props.row)" />
+          <q-btn 
+            v-if="['APPROVED', 'REJECTED'].includes(props.row.claimStatus)"
+            size="sm" 
+            color="teal-7" 
+            icon="visibility" 
+            label="查看審核歷程" 
+            @click="openAuditDialog(props.row)" 
+          />
+          <q-btn 
+            v-else
+            size="sm" 
+            color="indigo" 
+            icon="gavel" 
+            label="進入審核關卡" 
+            @click="openAuditDialog(props.row)" 
+          />
         </q-td>
       </template>
     </q-table>
 
-    <q-dialog v-model="auditDialog.show" persistent max-width="90vw" style="width: 1000px;">
+    <!-- <q-dialog v-model="auditDialog.show" persistent max-width="90vw" style="width: 1000px;">
       <q-card class="row no-wrap" style="max-height: 85vh;">
         
-        <q-card-section class="col-7 q-pa-md scroll" style="border-right: 1px solid #e0e0e0">
+        <q-btn 
+          icon="close" 
+          flat 
+          round 
+          dense 
+          v-close-popup 
+          class="absolute-top-right q-ma-sm text-grey-6" 
+          style="z-index: 10;"
+        /> -->
+        <q-dialog v-model="auditDialog.show" persistent>
+  <q-card style="width: 900px; max-width: 95vw;">
+    <!-- 關閉按鈕 -->
+    <q-btn icon="close" flat round dense v-close-popup class="absolute-top-right q-ma-sm" style="z-index: 10;" />
+              <q-card-section class="col-7 scroll">
+
+        <!-- <q-card-section class="col-7 q-pa-md scroll" style="border-right: 1px solid #e0e0e0"> -->
           <div class="text-h6 text-weight-bold text-primary q-mb-md">案件核決處理</div>
           
           <div class="row q-col-gutter-sm">
-            <div class="col-6"><q-input v-model="auditDialog.form.claimNo" label="案件編號" dense outlined readonly bg-color="grey-2" /></div>
-            <div class="col-6"><q-input v-model="auditDialog.form.policyNo" label="保單號碼" dense outlined readonly bg-color="grey-2" /></div>
-            <div class="col-6"><q-input v-model="auditDialog.form.memberId" label="客戶ID" dense outlined readonly bg-color="grey-2" /></div>
-            <div class="col-6"><q-input v-model="auditDialog.form.claimAmount" label="申請理賠金額" dense outlined readonly bg-color="grey-2" prefix="$" /></div>
-            <div class="col-12"><q-input v-model="auditDialog.form.remark" type="textarea" rows="2" label="原受理備註說明" dense outlined readonly bg-color="grey-2" /></div>
+          <div class="col-6"><q-input v-model="auditDialog.form.claimNo" label="案件編號" dense outlined readonly bg-color="grey-2" /></div>
+          <div class="col-6"><q-input v-model="auditDialog.form.policyNo" label="保單號碼" dense outlined readonly bg-color="grey-2" /></div>
+          <div class="col-6"><q-input v-model="auditDialog.form.memberName" label="客戶姓名" dense outlined readonly bg-color="grey-2" /></div>
+          <div class="col-6"><q-input v-model="auditDialog.form.productName" label="商品名稱" dense outlined readonly bg-color="grey-2" /></div>
+          <div class="col-12"><q-input v-model="auditDialog.form.claimAmount" label="申請理賠金額" dense outlined readonly bg-color="grey-2" prefix="$" /></div>
+          <div class="col-12"><q-input v-model="auditDialog.form.remark" type="textarea" rows="2" label="原受理備註說明" dense outlined readonly bg-color="grey-2" /></div>
+        </div>
+
+          <!-- 檔案連結區塊 -->
+        <div class="q-mt-md" v-if="auditDialog.form.file01Path || auditDialog.form.file02Path">
+          <div class="text-subtitle2 q-mb-xs">佐證電子文件</div>
+          <div class="row q-gutter-sm">
+            <q-btn v-if="auditDialog.form.file01Path" color="indigo" outline icon="picture_as_pdf" :label="auditDialog.form.file01Name || '診斷書'" @click="viewPdf(auditDialog.form.file01Path)" />
+            <q-btn v-if="auditDialog.form.file02Path" color="indigo" outline icon="picture_as_pdf" :label="auditDialog.form.file02Name || '收據'" @click="viewPdf(auditDialog.form.file02Path)" />
           </div>
+        </div>
 
           <q-separator class="q-my-lg" />
 
@@ -78,36 +135,63 @@
             </div>
             
             <div class="row justify-end q-gutter-sm q-mt-md">
-              <q-btn color="grey-6" label="取消關閉" v-close-popup />
-              <q-btn color="orange-8" icon="undo" label="撤回申請 (RETURN)" @click="submitDecision('RETURN')" />
-              <q-btn color="negative" icon="block" label="駁回拒絕 (REJECTED)" @click="submitDecision('REJECTED')" />
-              <q-btn color="positive" icon="check_circle" label="同意核可 (APPROVED)" @click="submitDecision('APPROVED')" />
+              
+              <q-btn 
+                v-if="getUserRole() === 'APPLICANT'"
+                color="orange-8" 
+                icon="undo" 
+                label="撤回申請 (RETURN)" 
+                @click="submitDecision('RETURN')" 
+              />
+              
+              <template v-if="['REVIEWER', 'ADMIN'].includes(getUserRole())">
+                <template v-if="!['APPROVED', 'REJECTED'].includes(auditDialog.form.claimStatus)">
+                  <q-btn color="negative" icon="block" label="駁回拒絕 (REJECTED)" @click="submitDecision('REJECTED')" />
+                  <q-btn color="positive" icon="check_circle" label="同意核可 (APPROVED)" @click="submitDecision('APPROVED')" />
+                </template>
+              </template>
             </div>
           </div>
         </q-card-section>
 
         <q-card-section class="col-5 q-pa-md bg-grey-1 scroll">
-          <div class="text-subtitle1 text-weight-bold text-grey-9 q-mb-md">📜 本案審核歷史履歷 (Log)</div>
+          <div class="text-subtitle1 text-weight-bold text-grey-9 q-mb-md">📜 本案審核歷程</div>
           
           <div v-if="historyLogs.length === 0" class="text-center text-grey-5 q-mt-xl">
             <q-icon name="history" size="lg" /><br>暫無前次變更紀錄
           </div>
           
-          <q-timeline v-else color="indigo">
-            <q-timeline-entry
-              v-for="log in historyLogs"
-              :key="log.claimLogNo"
-              :title="`變更狀態 ➔ ${log.claimStatus}`"
-              :subtitle="formatDate(log.aprvTime) + ' - 經辦: ' + log.aprvUser"
-              :icon="getLogIcon(log.claimStatus)"
-              :color="getStatusColor(log.claimStatus)"
+          <div v-else class="q-gutter-y-sm">
+            <q-card 
+              v-for="log in historyLogs" 
+              :key="log.claimLogNo" 
+              flat 
+              bordered 
+              class="bg-white q-pa-sm"
+              :style="`border-left: 5px solid var(--q-${getStatusColor(log.claimStatus)})`"
             >
-              <div class="text-caption text-grey-8">
-                <strong>核准金額:</strong> {{ log.approveAmount !== null ? `$${log.approveAmount}` : '無' }} <br>
-                <strong>審核意見:</strong> {{ log.aprvRemark || '未填寫意見' }}
+              <div class="row items-center justify-between q-mb-xs">
+                <q-badge :color="getStatusColor(log.claimStatus)" class="text-weight-bold">
+                  {{ log.claimStatus }}
+                </q-badge>
+                <div class="text-caption text-grey-6">{{ formatDate(log.aprvTime) }}</div>
               </div>
-            </q-timeline-entry>
-          </q-timeline>
+
+              <div class="text-caption text-grey-8 q-mt-xs">
+                <div class="q-mb-xs"><strong>審核人員:</strong> {{ log.aprvUser || '系統' }}</div>
+                <div class="q-mb-xs">
+                  <strong>核准金額:</strong> 
+                  <span :class="log.approveAmount > 0 ? 'text-weight-bold text-negative' : 'text-grey-6'">
+                    {{ log.approveAmount > 0 ? `$${log.approveAmount}` : '無' }}
+                  </span>
+                </div>
+                
+                <div class="bg-grey-2 q-pa-xs rounded-borders text-grey-9 q-mt-sm" style="min-height: 32px;">
+                  <strong>意見:</strong> {{ log.aprvRemark || '未填寫意見' }}
+                </div>
+              </div>
+            </q-card>
+          </div>
         </q-card-section>
 
       </q-card>
@@ -137,8 +221,10 @@ const statusOptions = [
 
 const columns: QTableColumn[] = [
   { name: 'claimNo', label: '理賠案號', field: 'claimNo', align: 'left', sortable: true },
+  { name: 'memberName', label: '客戶姓名', field: 'memberName', align: 'left' },
   { name: 'policyNo', label: '保單號碼', field: 'policyNo', align: 'left' },
   { name: 'claimAmount', label: '申請理賠金', field: 'claimAmount', align: 'right' },
+  { name: 'approveAmount', label: '核決理賠金', field: 'approveAmount', align: 'right', format: val => val !== null ? `$${val}` : '尚未核決' },
   { name: 'claimStatus', label: '當前關卡狀態', field: 'claimStatus', align: 'center' },
   { name: 'actions', label: '審核簽准', field: 'actions', align: 'center' }
 ]
@@ -195,12 +281,24 @@ async function submitDecision(actionType: string) {
     persistent: true
   }).onOk(async () => {
     try {
+      // 🌟 修正：從複雜的 User JSON 物件中解出大寫的 DISPLAY_NAME
+      const userJson = localStorage.getItem('User');
+      let currentUserName = '審核主管';
+      if (userJson) {
+        try {
+          const userObj = JSON.parse(userJson);
+          currentUserName = userObj.DISPLAY_NAME || '審核主管';
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
       await axios.put('/api/admin/claim-audit/decision', {
         claimNo: auditDialog.form.claimNo,
         action: auditForm.action,
         approveAmount: auditForm.action === 'APPROVED' ? auditForm.approveAmount : null,
         remark: auditForm.remark,
-        aprvUser: 'ADMIN_SUPERVISOR' // 這裡實務上可以抓目前登入的主管帳號變數
+        aprvUser: currentUserName // 🌟 這次送出的就會是精準的 "管理員" 囉！
       })
       $q.notify({ type: 'positive', message: '理賠核決與履歷更新成功！' })
       auditDialog.show = false
@@ -238,4 +336,42 @@ function formatDate(dateStr: string) {
 onMounted(() => {
   loadAuditData()
 })
+
+// 🌟 新增：獲取當前登入使用者的 ROLE_CODE 權限
+function getUserRole(): string {
+  const userJson = localStorage.getItem('User')
+  if (userJson) {
+    try {
+      const userObj = JSON.parse(userJson)
+      return userObj.ROLE_CODE || ''
+    } catch (e) {
+      console.error('讀取角色權限失敗', e)
+    }
+  }
+  return ''
+}
+
+function viewPdf(path: string | undefined) {
+  if (!path) return;
+
+  // 1. 如果路徑已經是完整網址，直接開
+  if (path.startsWith('http')) {
+    window.open(path, '_blank');
+    return;
+  }
+
+  // 2. 如果路徑是 /uploads/...，直接加上後端 Base URL
+  // 請確認 import.meta.env.VITE_API_BASE_URL 有值
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+  
+  // 組合網址：確保中間只有一個斜線
+  const cleanBase = baseUrl.replace(/\/$/, '');
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  const fullUrl = `${cleanBase}${cleanPath}`;
+  
+  console.log('準備開啟檔案，網址為:', fullUrl);
+  
+  // 3. 確保開啟的是一個絕對路徑，避開 Vue Router
+  window.open(fullUrl, '_blank');
+}
 </script>
