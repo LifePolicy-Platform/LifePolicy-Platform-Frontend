@@ -23,17 +23,18 @@ export const sidebarNavItems: SidebarNavItem[] = [
   { group: '我的工作台', groupOrder: 1, path: '/my-tasks', label: '個人待辦案件', title: '個人待辦案件', icon: 'assignment' },
 
   // 保單作業
-  { group: '保單作業', groupOrder: 2, path: '/policy-mgmt', label: '保單管理', title: '保單管理', icon: 'description' },
-  { group: '保單作業', groupOrder: 2, path: '/workbench', label: '投保申請工作台', title: '投保申請工作台', icon: 'work' },
-  { group: '保單作業', groupOrder: 2, path: '/updTime', label: '重新安排約訪', title: '重新安排約訪', icon: 'schedule' },
+  { group: '保單作業', groupOrder: 2, path: '/policy-mgmt', label: '保單管理', title: '保單管理', icon: 'work' },
+
+  // 約訪管理
+  { group: '約訪管理', groupOrder: 3, path: '/visit-mgmt/reschedule', label: '重新安排約訪', title: '重新安排約訪', icon: 'schedule' },
 
   // 理賠作業
   { group: '理賠作業', groupOrder: 3, path: '/claim/ClaimManagement', label: '理賠管理', title: '理賠管理', icon: 'receipt_long'},
   { group: '理賠作業', groupOrder: 3, path: '/claim/ClaimAuditManager', label: '理賠審核', title: '理賠審核', icon: 'rule'},
 
   // 商品管理
-  { group: '商品管理', groupOrder: 4, path: '/products', label: '商品維護', title: '商品維護', icon: 'inventory_2' },
+  { group: '商品管理', groupOrder: 5, path: '/products', label: '商品維護', title: '商品維護', icon: 'inventory_2' },
 
   // 系統管理
-  { group: '系統管理', groupOrder: 5, path: '/users', label: '使用者權限管理', title: '使用者權限管理', icon: 'admin_panel_settings', roles: ['ADMIN'] },
+  { group: '系統管理', groupOrder: 6, path: '/users', label: '使用者權限管理', title: '使用者權限管理', icon: 'admin_panel_settings', roles: ['ADMIN'] },
 ]

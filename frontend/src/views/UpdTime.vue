@@ -33,7 +33,7 @@ const {
 
 <template>
   <section class="page-with-hero appt-update-page">
-    <PageHero title="重新安排約訪時間" subtitle="查詢未完成訪名單並重新設定約訪時間" />
+    <PageHero title="重新安排約訪" subtitle="查詢未完成訪名單並重新設定約訪時間" />
 
     <div class="page-body appt-body">
       <q-card flat class="page-card page-card--accent appt-card">
