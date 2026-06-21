@@ -151,6 +151,17 @@ const router = createRouter({
       component: Workbench,
       meta: { title: '投保申請工作台', label: '投保申請工作台', hasTopHero: true, requiresAuth: true },
     },
+    {
+    path: '/claim/ClaimManagement',
+    name: 'ClaimManagement',
+    // 💡 確保這裡的 import 路徑有補上 /claim/ 資料夾
+    component: () => import('@/views/claim/ClaimManagement.vue'),
+    },
+    {
+    path: '/claim/ClaimAuditManager',
+    name: 'ClaimAuditManager',
+    component: () => import('@/views/claim/ClaimAuditManager.vue'),
+    }
   ],
 })
 
