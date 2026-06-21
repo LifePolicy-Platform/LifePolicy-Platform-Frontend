@@ -1,6 +1,6 @@
 export interface DashboardStat {
   title: string
-  value: string
+  count: number
   subtitle: string
   trend?: 'up' | 'down' | 'neutral'
 }
@@ -22,11 +22,20 @@ export interface InsuranceGoal {
   achievementRate: number
 }
 
-export interface MonthlyPerformance {
+export interface YearlyPerformance {
   amount: number
   subtitle: string
   trend: 'up' | 'down' | 'neutral'
   trendLabel?: string
+}
+
+export interface DashboardSummary {
+  yearlyPerformance: YearlyPerformance
+  insuranceGoal: InsuranceGoal
+  monthApplications: TimeSeriesPoint[]
+  policyStatusDistribution: BarChartItem[]
+  productCategorySales: BarChartItem[]
+  sideStats: DashboardStat[]
 }
 
 export interface RecentPolicyRow {

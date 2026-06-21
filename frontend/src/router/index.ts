@@ -2,7 +2,6 @@ import { createRouter, createWebHistory, type RouteMeta } from 'vue-router'
 import { setupRouterGuards } from './guards'
 import HomeView from '../views/HomeView.vue'
 import MyTasksView from '../views/MyTasksView.vue'
-import PolicyMgmtHubView from '../views/policy/PolicyMgmtHubView.vue'
 import ProductListView from '../views/product/ProductListView.vue'
 import UpdTime from '../views/UpdTime.vue'
 import PolicySearchView from '../views/PolicySearchView.vue'
@@ -14,6 +13,7 @@ import SearchView from '../views/SearchView.vue'
 import ProductDetailView from '../views/ProductDetailView.vue'
 import UsersView from '../views/UsersView.vue'
 import Workbench from '../views/Workbench.vue'
+import PolicyContentView from '../views/PolicyContentView.vue'
 
 export interface DemoRouteMeta extends Record<string, unknown> {
   shortLabel?: string
@@ -64,20 +64,36 @@ const router = createRouter({
     {
       path: '/policy-mgmt',
       name: 'policy-mgmt',
-      component: PolicyMgmtHubView,
-      meta: { title: '保單管理', label: '保單查詢', hasTopHero: true, requiresAuth: true },
+      component: Workbench,
+      meta: { title: '保單管理', label: '保單管理', hasTopHero: true, requiresAuth: true },
+    },
+    {
+      path: '/policy-mgmt/policy/:policyNo',
+      name: 'policy-mgmt-detail',
+      component: PolicyContentView,
+      meta: { title: '保單內容', requiresAuth: true },
     },
     {
       path: '/policy-mgmt/search',
-      redirect: { path: '/workbench', query: { tab: 'query' } },
+      redirect: { path: '/policy-mgmt', query: { tab: 'query' } },
     },
     {
       path: '/policy-mgmt/create',
-      redirect: { path: '/workbench', query: { tab: 'create' } },
+      redirect: { path: '/policy-mgmt', query: { tab: 'create' } },
     },
     {
       path: '/policy-mgmt/review',
-      redirect: { path: '/workbench', query: { tab: 'review' } },
+      redirect: { path: '/policy-mgmt', query: { tab: 'review' } },
+    },
+    {
+      path: '/workbench',
+      redirect: (to) => ({ path: '/policy-mgmt', query: to.query }),
+    },
+    {
+      path: '/workbench/policy/:policyNo',
+      redirect: (to) => ({
+        path: `/policy-mgmt/policy/${String(to.params.policyNo)}`,
+      }),
     },
     {
       path: '/products',
@@ -98,10 +114,14 @@ const router = createRouter({
       meta: { title: '保單查詢元件拆分示範', label: '保單查詢練習', hasTopHero: true },
     },
     {
-      path: '/updTime',
-      name: 'updTime',
+      path: '/visit-mgmt/reschedule',
+      name: 'visit-reschedule',
       component: UpdTime,
-      meta: { title: '重新安排約訪時間', label: '重新安排約訪時間', requiresAuth: true, hasTopHero: true },
+      meta: { title: '重新安排約訪', label: '重新安排約訪', hasTopHero: true, requiresAuth: true },
+    },
+    {
+      path: '/updTime',
+      redirect: '/visit-mgmt/reschedule',
     },
     {
       path: '/cart',
@@ -133,23 +153,11 @@ const router = createRouter({
       component: ProductDetailView,
       meta: { title: '商品詳情', description: '單一商品數量與金額試算' },
     },
-     {
-       path: '/workbench',
-       name: 'workbench',
-       component: Workbench,
-       meta: { title: '保單', description: '保單' },
-     },
     {
       path: '/users',
       name: 'users',
       component: UsersView,
       meta: { title: '使用者管理', label: '使用者權限管理', requiresAuth: true, requiresRole: 'ADMIN' },
-    },
-    {
-      path: '/workbench',
-      name: 'workbench',
-      component: Workbench,
-      meta: { title: '投保申請工作台', label: '投保申請工作台', hasTopHero: true, requiresAuth: true },
     },
   ],
 })

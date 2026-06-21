@@ -48,3 +48,61 @@ export interface AptBatchUpdateResponse {
   errorMsg: string | null
   recallTime: string | null   // 成功時回傳新約訪時間 "yyyy-MM-dd HH:mm:ss"
 }
+
+export interface PolicyAppointmentContext {
+  policyNo: string
+  listNo: string
+  memberId: number
+  custName: string
+  listLastPhone: string
+  /** 0=未處理，1=已約訪，2=已結案 */
+  listStatus: number
+  pendingAppointmentSno?: number | null
+  pendingAppointmentUser?: string | null
+}
+
+export interface ActiveProjectOption {
+  campCode: string
+  campName: string
+  campServiceDt: string
+}
+
+export interface CallAppointmentItem {
+  sno: number
+  recNo: string
+  listNo: string
+  projectCode: string
+  projectName: string
+  recallTime: string
+  recTime: string | null
+  /** 0=尚未完成，1=約訪成功，2=約訪失敗 */
+  recallResult: number
+}
+
+export interface CallAppointmentCreateRequest {
+  policyNo: string
+  campCode: string
+  recallTime: string
+}
+
+export interface CallAppointmentCreateResponse {
+  sno: number
+  recNo: string
+  listNo: string
+  campCode: string
+  recallTime: string
+}
+
+export interface CallAppointmentConfirmRequest {
+  policyNo: string
+  /** 1=約訪成功，2=約訪失敗 */
+  recallResult: number
+}
+
+export interface CallAppointmentConfirmResponse {
+  sno: number
+  listNo: string
+  recallResult: number
+  listStatus: number
+  recTime: string
+}

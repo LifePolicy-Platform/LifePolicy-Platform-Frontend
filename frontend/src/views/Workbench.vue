@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { useQuasar } from 'quasar'
 import { useAuthStore } from '@/stores/auth'
 import { useRoute, useRouter } from 'vue-router'
@@ -19,7 +19,9 @@ import {
   APPLICATION_STATUS_LABEL,
   applicationStatusColor,
   applicationStatusLabel,
+  BUSINESS_REVIEW_OPTIONS,
   reviewSuccessMessage,
+  SUPERVISOR_REVIEW_OPTIONS,
 } from '@/constants/applicationStatus'
 
 type ProductOption = { label: string; value: string }
@@ -31,6 +33,8 @@ const authStore = useAuthStore()
 
 // ---- 商品清單 ----
 const products = ref<ProductListItem[]>([])
+const productsExpanded = ref(false)
+const PRODUCT_PREVIEW_COUNT = 5
 const createProductOptions = ref<ProductOption[]>([])
 const queryProductOptions = ref<ProductOption[]>([{ label: '全部', value: '' }])
 const editProductOptions = ref<ProductOption[]>([])
@@ -72,6 +76,17 @@ function filterProductOptions(
   })
 }
 
+const visibleProducts = computed(() =>
+  productsExpanded.value ? products.value : products.value.slice(0, PRODUCT_PREVIEW_COUNT),
+)
+
+const hasMoreProducts = computed(() => products.value.length > PRODUCT_PREVIEW_COUNT)
+
+function goToPolicyDetail(policyNo: string) {
+  if (!policyNo?.trim()) return
+  router.push({ name: 'policy-mgmt-detail', params: { policyNo: policyNo.trim() } })
+}
+
 async function loadProducts() {
   try {
     products.value = await fetchActiveProducts()
@@ -104,10 +119,6 @@ const statusOptions = [
   { label: APPLICATION_STATUS_LABEL.SUBMIT, value: 'SUBMIT' },
   { label: APPLICATION_STATUS_LABEL.RETURN, value: 'RETURN' },
 ]
-const targetStatusOptions = [
-  { label: '核准', value: 'APPROVED' },
-  { label: '拒絕', value: 'REJECTED' },
-]
 const sortOptions = [
   { label: '由新到舊', value: 'DESC' },
   { label: '由舊到新', value: 'ASC' }
@@ -136,7 +147,9 @@ watch(activeTab, (tab) => {
 const canCreate = computed(() => authStore.isAuthenticated && authStore.roles.includes('APPLICANT'))
 const canQuery = computed(() => authStore.isAuthenticated)
 const canEdit = computed(() => authStore.roles.includes('APPLICANT'))
-const canReview = computed(() => authStore.roles.includes('REVIEWER'))
+const canBusinessReview = computed(() => authStore.roles.includes('APPLICANT'))
+const canSupervisorReview = computed(() => authStore.roles.includes('REVIEWER'))
+const canAccessReviewTab = computed(() => canBusinessReview.value || canSupervisorReview.value)
 const displayName = computed(
   () => authStore.currentUser?.DISPLAY_NAME ?? authStore.currentUser?.USERNAME ?? '',
 )
@@ -187,11 +200,40 @@ const queryForm = reactive({
 
 const reviewForm = reactive({
   applicationId: '',
+  sourceStatus: '' as string,
   targetStatus: 'APPROVED',
   rejectionReason: '',
   docIdentity: false,
   docProposal: false,
   docHealth: false
+})
+
+const reviewTargetOptions = computed(() => {
+  if (reviewForm.sourceStatus === 'SUBMIT') {
+    return [...BUSINESS_REVIEW_OPTIONS]
+  }
+  if (reviewForm.sourceStatus === 'PENDING') {
+    return [...SUPERVISOR_REVIEW_OPTIONS]
+  }
+  return []
+})
+
+const reviewStageTitle = computed(() => {
+  if (reviewForm.sourceStatus === 'SUBMIT') return '業務審核（SUBMIT 關卡）'
+  if (reviewForm.sourceStatus === 'PENDING') return '主管審核（PENDING 關卡）'
+  return '審核作業'
+})
+
+const showDocumentCheck = computed(() => reviewForm.sourceStatus === 'PENDING')
+
+const requiresRejectionReason = computed(() =>
+  reviewForm.targetStatus === 'REJECTED' || reviewForm.targetStatus === 'RETURN',
+)
+
+const canPerformLoadedReview = computed(() => {
+  if (reviewForm.sourceStatus === 'SUBMIT') return canBusinessReview.value
+  if (reviewForm.sourceStatus === 'PENDING') return canSupervisorReview.value
+  return false
 })
 
 const submitting = ref(false)
@@ -205,7 +247,7 @@ const hasQueried = ref(false)
 
 // q-table 欄位定義
 const columns = [
-  { name: 'applicationId', label: '申請編號', field: 'APPLICATION_ID', align: 'left' as const },
+  { name: 'applicationId', label: '保單編號', field: 'APPLICATION_ID', align: 'left' as const },
   { name: 'applicant', label: '投保人', field: 'APPLICANT_NAME', align: 'left' as const },
   { name: 'insured', label: '被保人', field: 'INSURED_NAME', align: 'left' as const },
   { name: 'product', label: '商品', field: 'PRODUCT_CODE', align: 'left' as const },
@@ -235,11 +277,11 @@ async function openPolicyHistory(record: PolicyRecord) {
   try {
     const logs = await fetchPolicyAprvLogs(policyNo)
     historyRows.value = logs.map((log) => ({
+      id: log.POLICY_LOG_NO,
       time: formatAprvLogTime(log.APRV_TIME),
-      eventName: '審核歷程',
       status: applicationStatusLabel(log.APRV_STATUS),
+      statusCode: log.APRV_STATUS,
       handler: log.DISPLAY_NAME || '—',
-      reason: '',
       remark: log.APRV_REMARK?.trim() || '—',
     }))
   } catch (error: unknown) {
@@ -275,9 +317,12 @@ const riskLevelHint = computed(() => {
 
 const duplicateWarning = ref('尚未檢查')
 
-const documentHint = computed(() =>
-  areDocumentsConfirmed() ? '文件檢核完成，可進入審核' : '尚有文件未確認，系統會拒絕送審'
-)
+const documentHint = computed(() => {
+  if (!canSupervisorReview.value) {
+    return areDocumentsConfirmed() ? '文件檢核完成' : '主管審核時需完成文件檢核'
+  }
+  return areDocumentsConfirmed() ? '文件檢核完成，可進入主管審核' : '主管審核前，請先完成三項文件勾選'
+})
 
 // ---- 工具函式 ----
 function calculateAge(dateString: string): number {
@@ -397,9 +442,11 @@ function hasQueryCriteria(): boolean {
   )
 }
 
-async function handleQuery() {
+async function handleQuery(options?: { silent?: boolean }) {
   if (!hasQueryCriteria()) {
-    notifyError('查詢至少要填一個條件，或指定一段送件時間')
+    if (!options?.silent) {
+      notifyError('查詢至少要填一個條件，或指定一段送件時間')
+    }
     return
   }
   if (
@@ -427,7 +474,9 @@ async function handleQuery() {
     queryResults.value = result.RECORDS || []
     queryMeta.value = `第 ${result.PAGE_NO} 頁 / 共 ${result.TOTAL_PAGES} 頁，總筆數 ${result.TOTAL_COUNT}`
     hasQueried.value = true
-    notifySuccess(`查詢完成，共 ${result.TOTAL_COUNT} 筆`)
+    if (!options?.silent) {
+      notifySuccess(`查詢完成，共 ${result.TOTAL_COUNT} 筆`)
+    }
   } catch (error: any) {
     notifyError(error.response?.data?.MESSAGE || '查詢失敗')
   } finally {
@@ -477,8 +526,19 @@ function loadRecordToEdit(record: PolicyRecord) {
 }
 
 function loadRecordToReview(record: PolicyRecord) {
+  if (!canReviewRow(record)) {
+    notifyError('您沒有權限審核此狀態的案件')
+    return
+  }
   reviewForm.applicationId = record.APPLICATION_ID
-  reviewForm.targetStatus = record.APPLICATION_STATUS === 'REJECTED' ? 'REJECTED' : 'APPROVED'
+  reviewForm.sourceStatus = record.APPLICATION_STATUS || ''
+  if (record.APPLICATION_STATUS === 'SUBMIT') {
+    reviewForm.targetStatus = 'PENDING'
+  } else if (record.APPLICATION_STATUS === 'PENDING') {
+    reviewForm.targetStatus = 'APPROVED'
+  } else {
+    reviewForm.targetStatus = 'APPROVED'
+  }
   reviewForm.rejectionReason = record.REJECTION_REASON || ''
   reviewForm.docIdentity = false
   reviewForm.docProposal = false
@@ -489,10 +549,13 @@ function loadRecordToReview(record: PolicyRecord) {
 }
 
 function canEditRow(record: PolicyRecord): boolean {
-  return canEdit.value && record.APPLICATION_STATUS === 'PENDING'
+  return canEdit.value && record.APPLICATION_STATUS === 'RETURN'
 }
 function canReviewRow(record: PolicyRecord): boolean {
-  return canReview.value && record.APPLICATION_STATUS === 'PENDING'
+  const status = record.APPLICATION_STATUS
+  if (status === 'SUBMIT') return canBusinessReview.value
+  if (status === 'PENDING') return canSupervisorReview.value
+  return false
 }
 
 // ---- 修改 ----
@@ -509,7 +572,7 @@ async function handleEdit() {
   submitting.value = true
   try {
     const result = await updatePolicyApplication(editForm.applicationId, buildPayload(editForm))
-    notifySuccess(`修改成功，風險等級 ${result.RISK_LEVEL}`)
+    notifySuccess(`修改成功，已重新送審（SUBMIT），風險等級 ${result.RISK_LEVEL}`)
   } catch (error: any) {
     notifyError(error.response?.data?.MESSAGE || '修改失敗')
   } finally {
@@ -518,17 +581,32 @@ async function handleEdit() {
 }
 
 // ---- 審核 ----
+function resetReviewForm() {
+  reviewForm.applicationId = ''
+  reviewForm.sourceStatus = ''
+  reviewForm.targetStatus = 'APPROVED'
+  reviewForm.rejectionReason = ''
+  reviewForm.docIdentity = false
+  reviewForm.docProposal = false
+  reviewForm.docHealth = false
+  reviewLoaded.value = false
+}
+
 async function handleReview() {
   if (!reviewLoaded.value) {
     notifyError('請先從查詢結果載入要審核的案件')
     return
   }
-  if (reviewForm.targetStatus === 'REJECTED' && !reviewForm.rejectionReason.trim()) {
-    notifyError('選擇「拒絕」時必須填寫拒絕原因')
+  if (!canPerformLoadedReview.value) {
+    notifyError('您沒有權限審核此狀態的案件')
     return
   }
-  if (!areDocumentsConfirmed()) {
-    notifyError('送出審核前，請先完成三項文件勾選')
+  if (requiresRejectionReason.value && !reviewForm.rejectionReason.trim()) {
+    notifyError(reviewForm.targetStatus === 'RETURN' ? '業務駁回時必須填寫原因' : '主管拒絕時必須填寫原因')
+    return
+  }
+  if (showDocumentCheck.value && !areDocumentsConfirmed()) {
+    notifyError('主管審核前，請先完成三項文件勾選')
     return
   }
   submitting.value = true
@@ -537,11 +615,18 @@ async function handleReview() {
       APPLICATION_ID: reviewForm.applicationId.trim(),
       TARGET_STATUS: reviewForm.targetStatus,
       REJECTION_REASON: reviewForm.rejectionReason.trim() || null,
-      DOCUMENTS_CONFIRMED: areDocumentsConfirmed(),
+      DOCUMENTS_CONFIRMED: showDocumentCheck.value ? areDocumentsConfirmed() : true,
       REVIEWED_BY: authStore.currentUser?.USERNAME ?? '',
     })
     const status = result.CURRENT_STATUS ?? reviewForm.targetStatus
-    notifySuccess(reviewSuccessMessage(status))
+    const successMsg = reviewSuccessMessage(status)
+    resetReviewForm()
+    activeTab.value = 'query'
+    await nextTick()
+    if (hasQueried.value) {
+      await handleQuery({ silent: true })
+    }
+    notifySuccess(successMsg)
   } catch (error: any) {
     notifyError(error.response?.data?.MESSAGE || '審核失敗')
   } finally {
@@ -560,18 +645,18 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
       APPLICANT_ID_NO: form.applicantIdNo.trim(),
       INSURED_ID_NO: form.insuredIdNo.trim(),
       PRODUCT_CODE: form.productCode,
-      APPLICATION_STATUS: 'PENDING',
       PAGE_NO: 1,
-      PAGE_SIZE: 10,
+      PAGE_SIZE: 20,
       SORT_DIRECTION: 'DESC'
     })
-    const records = result.RECORDS || []
+    const activeStatuses = new Set(['SUBMIT', 'PENDING', 'RETURN'])
+    const records = (result.RECORDS || []).filter((item) => activeStatuses.has(item.APPLICATION_STATUS || ''))
     const duplicates = currentApplicationId
       ? records.filter((item) => item.APPLICATION_ID !== currentApplicationId)
       : records
     duplicateWarning.value = duplicates.length
-      ? `偵測到 ${duplicates.length} 筆相似 PENDING 申請，送出前請再確認`
-      : '未發現相同投保人/被保人/商品的 PENDING 申請'
+      ? `偵測到 ${duplicates.length} 筆進行中申請（送件/待審/退回），送出前請再確認`
+      : '未發現相同投保人/被保人/商品的進行中申請'
   } catch (error: any) {
     duplicateWarning.value = error.response?.data?.MESSAGE || '檢查失敗'
   }
@@ -589,7 +674,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
       <div class="page-hero__inner workbench-hero__grid">
         <div class="workbench-hero__copy">
           <p class="workbench-eyebrow">Financial Life Insurance</p>
-          <h2 class="page-hero__title">投保申請作業工作台</h2>
+          <h2 class="page-hero__title">保單管理</h2>
           <p class="page-hero__subtitle">
             同一頁完成新增、查詢、修改、審核，並即時呈現保費比例、風險等級、缺件提醒與重複投保預警。
           </p>
@@ -748,9 +833,13 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   <q-input v-model.number="queryForm.pageNo" label="頁碼" outlined dense type="number" />
                   <q-input v-model.number="queryForm.pageSize" label="筆數" outlined dense type="number" />
                 </div>
-                <div class="q-mt-md q-gutter-sm">
+                <div class="q-mt-md row items-center wrap q-gutter-sm">
                   <q-btn color="primary" unelevated label="執行查詢" no-caps icon="search" :loading="submitting" @click="handleQuery" />
                   <q-btn outline color="primary" label="清空條件" no-caps icon="refresh" @click="resetQuery" />
+                  <span class="workbench-query-hint text-caption text-grey-7">
+                    <q-icon name="info_outline" size="16px" class="q-mr-xs" />
+                    點擊保單編號可查看詳細資料
+                  </span>
                 </div>
 
                 <q-table
@@ -765,6 +854,17 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   :rows-per-page-options="[0]"
                   :no-data-label="hasQueried ? '查無資料' : '尚未查詢資料'"
                 >
+                  <template #body-cell-applicationId="props">
+                    <q-td :props="props">
+                      <button
+                        type="button"
+                        class="workbench-policy-link"
+                        @click="goToPolicyDetail(props.row.APPLICATION_ID)"
+                      >
+                        {{ props.row.APPLICATION_ID }}
+                      </button>
+                    </q-td>
+                  </template>
                   <template #body-cell-applicant="props">
                     <q-td :props="props">
                       {{ props.row.APPLICANT_NAME || '—' }}
@@ -840,7 +940,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
               <div class="page-card__header">
                 <div>
                   <p class="page-card__kicker">POL_APP_UPD</p>
-                  <div class="page-card__title">修改 PENDING 案件</div>
+                  <div class="page-card__title">修改 RETURN 退回案件</div>
                 </div>
                 <q-btn outline color="primary" label="檢查重複投保" no-caps icon="warning_amber" @click="runDuplicateCheck(editForm, editForm.applicationId)" />
               </div>
@@ -900,34 +1000,53 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
               <div class="page-card__header">
                 <div>
                   <p class="page-card__kicker">POL_APP_APRV</p>
-                  <div class="page-card__title">審核作業</div>
+                  <div class="page-card__title">{{ reviewStageTitle }}</div>
                 </div>
               </div>
 
-              <q-banner v-if="!canReview" rounded class="bg-amber-1 text-brown-8 q-mt-md">此功能僅開放 REVIEWER 使用。</q-banner>
-              <q-banner v-else-if="!reviewLoaded" rounded class="bg-amber-1 text-brown-8 q-mt-md">請先從查詢結果帶入待審案件。</q-banner>
+              <q-banner v-if="!canAccessReviewTab" rounded class="bg-amber-1 text-brown-8 q-mt-md">
+                此功能僅開放 APPLICANT（業務審核）或 REVIEWER（主管審核）使用。
+              </q-banner>
+              <q-banner v-else-if="!reviewLoaded" rounded class="bg-amber-1 text-brown-8 q-mt-md">
+                請先從查詢結果帶入待審案件：業務審核 SUBMIT、主管審核 PENDING。
+              </q-banner>
+              <q-banner v-else-if="!canPerformLoadedReview" rounded class="bg-amber-1 text-brown-8 q-mt-md">
+                您沒有權限審核此狀態的案件，請重新從查詢結果帶入。
+              </q-banner>
 
               <template v-else>
+                <q-banner rounded class="bg-blue-1 text-blue-9 q-mt-md">
+                  目前狀態：{{ applicationStatusLabel(reviewForm.sourceStatus) }}
+                </q-banner>
                 <div class="form-grid q-mt-md">
-                  <q-input v-model="reviewForm.applicationId" label="申請編號" outlined dense readonly />
+                  <q-input v-model="reviewForm.applicationId" label="保單編號" outlined dense readonly />
                   <div class="identity-tile">
                     <div class="text-caption text-grey-7">審核人員</div>
                     <div class="text-weight-bold">{{ displayName }}</div>
                   </div>
-                  <q-select v-model="reviewForm.targetStatus" label="目標狀態" outlined dense :options="targetStatusOptions" emit-value map-options />
+                  <q-select
+                    v-model="reviewForm.targetStatus"
+                    label="審核結果"
+                    outlined
+                    dense
+                    :options="reviewTargetOptions"
+                    emit-value
+                    map-options
+                  />
                   <q-input
+                    v-if="requiresRejectionReason"
                     v-model="reviewForm.rejectionReason"
                     class="full-span"
-                    label="拒絕原因"
+                    :label="reviewForm.targetStatus === 'RETURN' ? '業務駁回原因' : '主管拒絕原因'"
                     outlined
                     type="textarea"
                     rows="3"
-                    hint="若選擇「拒絕」，請填寫原因"
+                    :hint="reviewForm.targetStatus === 'RETURN' ? '業務駁回時請填寫原因' : '主管拒絕時請填寫原因'"
                   />
                 </div>
 
-                <q-card flat bordered class="q-mt-md q-pa-md workbench-doc-card">
-                  <div class="text-weight-bold q-mb-sm text-primary">文件完整性檢核</div>
+                <q-card v-if="showDocumentCheck" flat bordered class="q-mt-md q-pa-md workbench-doc-card">
+                  <div class="text-weight-bold q-mb-sm text-primary">文件完整性檢核（主管審核）</div>
                   <q-checkbox v-model="reviewForm.docIdentity" label="身分證明" />
                   <q-checkbox v-model="reviewForm.docProposal" label="要保書" />
                   <q-checkbox v-model="reviewForm.docHealth" label="健康告知" />
@@ -956,9 +1075,21 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
 
           <q-card flat class="page-card page-card--accent workbench-insight">
             <q-card-section>
-              <div class="text-subtitle1 text-weight-bold q-mb-md text-primary">商品參考</div>
-              <q-list separator>
-                <q-item v-for="p in products" :key="p.code" class="product-item">
+              <div class="row items-center no-wrap q-mb-md">
+                <div class="text-subtitle1 text-weight-bold text-primary col">商品參考</div>
+                <q-btn
+                  v-if="hasMoreProducts"
+                  flat
+                  dense
+                  round
+                  color="primary"
+                  :icon="productsExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down'"
+                  :aria-label="productsExpanded ? '收合商品列表' : '展開全部商品'"
+                  @click="productsExpanded = !productsExpanded"
+                />
+              </div>
+              <q-list separator class="workbench-product-list">
+                <q-item v-for="p in visibleProducts" :key="p.code" class="product-item">
                   <q-item-section>
                     <q-item-label class="text-weight-bold">{{ p.code }}</q-item-label>
                     <q-item-label>{{ p.name }}</q-item-label>
@@ -966,6 +1097,12 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   </q-item-section>
                 </q-item>
               </q-list>
+              <div
+                v-if="hasMoreProducts && !productsExpanded"
+                class="workbench-product-more text-caption text-grey-6 text-center q-pt-sm"
+              >
+                另有 {{ products.length - PRODUCT_PREVIEW_COUNT }} 項商品，點擊箭頭展開
+              </div>
             </q-card-section>
           </q-card>
         </aside>
@@ -974,20 +1111,26 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
   </section>
 
   <q-dialog v-model="historyDialogOpen" persistent>
-    <q-card style="min-width: 720px; max-width: 95vw">
-      <q-card-section class="row items-center q-pb-none">
-        <div class="text-h6">審核歷程</div>
-        <q-space />
-        <q-btn icon="close" flat round dense v-close-popup />
+    <q-card class="history-dialog-card">
+      <q-card-section class="history-dialog-card__header row items-start no-wrap q-pb-sm">
+        <q-avatar rounded color="primary" text-color="white" icon="history" size="40px" class="q-mr-md" />
+        <div class="col">
+          <div class="text-h6 text-weight-bold text-grey-9">審核歷程</div>
+          <div class="text-caption text-grey-7 q-mt-xs">
+            申請編號
+            <q-badge outline color="grey-6" class="q-ml-xs history-dialog-card__policy-no">
+              {{ historyPolicyNo }}
+            </q-badge>
+          </div>
+        </div>
+        <q-btn icon="close" flat round dense color="grey-7" v-close-popup />
       </q-card-section>
-      <q-card-section class="text-caption text-grey-7 q-pt-none">
-        申請編號：{{ historyPolicyNo }}
-      </q-card-section>
-      <q-card-section>
-        <q-inner-loading :showing="historyLoading">
-          <q-spinner size="40px" color="primary" />
-        </q-inner-loading>
-        <PolicyHistoryTable v-if="!historyLoading" :rows="historyRows" />
+
+      <q-separator />
+
+      <q-card-section class="relative-position history-dialog-body">
+        <PolicyHistoryTable :rows="historyRows" />
+        <q-inner-loading :showing="historyLoading" color="primary" />
       </q-card-section>
     </q-card>
   </q-dialog>
@@ -1100,7 +1243,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
   display: grid;
   gap: 4px;
   padding: 8px 0;
-  border-bottom: 1px solid #edf2f7;
+  border-bottom: 1px solid #d8dee6;
 }
 
 .hint-row--last {
@@ -1135,6 +1278,64 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
 .workbench-table :deep(.q-table thead th) {
   font-size: 0.85rem;
   font-weight: 700;
+}
+
+.history-dialog-body {
+  min-height: 160px;
+  padding: 16px 20px 20px;
+  background: #fafbfc;
+}
+
+.history-dialog-card {
+  min-width: 680px;
+  max-width: 95vw;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #cbd5e0;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
+}
+
+.history-dialog-card__header {
+  padding: 18px 20px 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8faf9 100%);
+}
+
+.history-dialog-card__policy-no {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+}
+
+.workbench-query-hint {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+}
+
+.workbench-policy-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--q-primary);
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.workbench-policy-link:hover {
+  color: #2f855a;
+}
+
+.workbench-product-list {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.workbench-product-more {
+  border-top: 1px dashed #cbd5e0;
 }
 
 @media (max-width: 1100px) {

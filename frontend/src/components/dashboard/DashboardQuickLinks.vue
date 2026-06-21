@@ -3,7 +3,7 @@ import { RouterLink } from 'vue-router'
 
 const links = [
   { label: '保單查詢', to: '/policies', icon: 'description' },
-  { label: '重新安排約訪', to: '/updTime', icon: 'schedule' },
+  { label: '重新安排約訪', to: '/visit-mgmt/reschedule', icon: 'schedule' },
   { label: '代辦事項', to: '/todoList', icon: 'checklist' },
 ]
 </script>
