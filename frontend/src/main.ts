@@ -34,8 +34,11 @@ app.use(Quasar, {
     },
   },
   components: {
-    QBanner, QBar, QBtn, QCard, QCardActions, QCardSection, QCheckbox, QChip, QDate, QDialog, QIcon, QImg, QInput, QItem, QItemLabel, QItemSection, QList, QPopupProxy, QRadio,
-    QSelect, QSeparator, QSpace, QSpinner, QTab, QTable, QTabPanel, QTabPanels, QTabs, QTd, QTime, QToggle,
+    QBanner, QBtn, QCard, QCardSection, QCheckbox, QChip, QDate, QDialog, QIcon, QImg, QInput,
+    QItem, QItemLabel, QItemSection, QList, QPopupProxy, QRadio,
+    QSelect, QSeparator, QTab, QTable, QPagination, QTabPanel, QTabPanels, QTabs, QTd, QTime, QTr,
+    QPage, QSpace, QCardActions,
+    QBadge
   },
   directives: {
     ClosePopup,

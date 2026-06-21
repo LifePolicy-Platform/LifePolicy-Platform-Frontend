@@ -2,6 +2,18 @@
    全站頁面設計系統（對齊 Dashboard Notus 綠白風格）
    ============================================================ */
 
+:root {
+  --page-hero-gradient: linear-gradient(
+    125deg,
+    #2c5282 0%,
+    #2b7a9e 18%,
+    #2f855a 42%,
+    #38a169 62%,
+    #48bb78 85%,
+    #68d391 100%
+  );
+}
+
 .page-with-hero {
   --notus-green: #48bb78;
   --notus-green-dark: #38a169;
@@ -27,12 +39,7 @@
   overflow: hidden;
   min-height: clamp(148px, 18vh, 200px);
   padding: calc(var(--chrome-height) + 12px) 28px 72px;
-  background: linear-gradient(
-    135deg,
-    var(--notus-green-dark) 0%,
-    var(--notus-green) 42%,
-    var(--notus-green-light) 88%
-  );
+  background: var(--page-hero-gradient);
 }
 
 .page-hero__blobs {
@@ -95,6 +102,40 @@
   font-weight: 500;
   max-width: 52ch;
   line-height: 1.55;
+}
+
+/* Dashboard 等較矮 Hero（保留原高度，特效與一般 Hero 一致） */
+.page-hero--compact {
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: clamp(108px, 13vh, 148px);
+  padding: calc(var(--chrome-height) + 6px) 20px 44px;
+}
+
+.page-hero--compact .page-hero__inner {
+  max-width: 980px;
+  padding: 0 16px;
+}
+
+.page-hero--compact .page-hero__blob--1 {
+  width: 200px;
+  height: 200px;
+  top: -64px;
+  right: -28px;
+}
+
+.page-hero--compact .page-hero__blob--2 {
+  width: 140px;
+  height: 140px;
+  bottom: -48px;
+  left: 8%;
+}
+
+.page-hero--compact .page-hero__blob--3 {
+  width: 96px;
+  height: 96px;
+  top: 18%;
+  right: 22%;
 }
 
 .page-body {
@@ -299,6 +340,11 @@
   .page-hero {
     min-height: 132px;
     padding: calc(var(--chrome-height) + 8px) 20px 64px;
+  }
+
+  .page-hero--compact {
+    min-height: 100px;
+    padding: calc(var(--chrome-height) + 4px) 16px 36px;
   }
 
   .page-body {

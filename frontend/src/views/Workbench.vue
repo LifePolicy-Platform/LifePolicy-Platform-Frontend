@@ -144,6 +144,20 @@ watch(activeTab, (tab) => {
   }
 })
 
+const workflowSteps: { key: TabKey; icon: string; label: string; desc: string }[] = [
+  { key: 'create', icon: 'add_circle_outline', label: '新增申請', desc: '建立投保資料' },
+  { key: 'query', icon: 'search', label: '查詢案件', desc: '搜尋與檢視' },
+  { key: 'edit', icon: 'edit_note', label: '修改案件', desc: '補正退回件' },
+  { key: 'review', icon: 'fact_check', label: '審核案件', desc: '業務／主管審核' },
+]
+
+function goToWorkflowTab(tab: TabKey) {
+  activeTab.value = tab
+  nextTick(() => {
+    document.querySelector('.workbench-tab-card')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  })
+}
+
 const canCreate = computed(() => authStore.isAuthenticated && authStore.roles.includes('APPLICANT'))
 const canQuery = computed(() => authStore.isAuthenticated)
 const canEdit = computed(() => authStore.roles.includes('APPLICANT'))
@@ -656,7 +670,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
       : records
     duplicateWarning.value = duplicates.length
       ? `偵測到 ${duplicates.length} 筆進行中申請（送件/待審/退回），送出前請再確認`
-      : '未發現相同投保人/被保人/商品的進行中申請'
+      : '未發現重複投保風險，可進行投保申請'
   } catch (error: any) {
     duplicateWarning.value = error.response?.data?.MESSAGE || '檢查失敗'
   }
@@ -671,42 +685,35 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
         <span class="page-hero__blob page-hero__blob--2" />
         <span class="page-hero__blob page-hero__blob--3" />
       </div>
-      <div class="page-hero__inner workbench-hero__grid">
+      <div class="page-hero__inner workbench-hero__inner">
         <div class="workbench-hero__copy">
-          <p class="workbench-eyebrow">Financial Life Insurance</p>
+          <p class="workbench-eyebrow">Policy Operations Workbench</p>
           <h2 class="page-hero__title">保單管理</h2>
-          <p class="page-hero__subtitle">
-            同一頁完成新增、查詢、修改、審核，並即時呈現保費比例、風險等級、缺件提醒與重複投保預警。
-          </p>
         </div>
 
-        <q-card flat class="page-hero-card workbench-identity-card">
-          <q-card-section>
-            <div class="text-subtitle2 text-weight-bold q-mb-sm">目前身分</div>
-            <template v-if="authStore.isAuthenticated">
-              <div class="text-h6 text-weight-medium q-mb-xs">{{ displayName }}</div>
-              <div class="q-gutter-xs q-mb-md">
-                <q-chip
-                  v-for="role in authStore.roles"
-                  :key="role"
-                  dense
-                  size="sm"
-                  color="primary"
-                  text-color="white"
-                >
-                  {{ role }}
-                </q-chip>
-              </div>
-              <q-btn flat no-caps color="primary" label="返回 Dashboard" to="/dashboard" icon="dashboard" />
-            </template>
-            <div v-else class="text-body2 text-grey-7">尚未登入，請先登入後再操作。</div>
-          </q-card-section>
-        </q-card>
+        <nav class="workbench-workflow" aria-label="作業流程">
+          <button
+            v-for="step in workflowSteps"
+            :key="step.key"
+            type="button"
+            class="workbench-workflow__step"
+            :class="{ 'workbench-workflow__step--active': activeTab === step.key }"
+            @click="goToWorkflowTab(step.key)"
+          >
+            <span class="workbench-workflow__icon" aria-hidden="true">
+              <q-icon :name="step.icon" size="20px" />
+            </span>
+            <span class="workbench-workflow__text">
+              <span class="workbench-workflow__label">{{ step.label }}</span>
+              <span class="workbench-workflow__desc">{{ step.desc }}</span>
+            </span>
+          </button>
+        </nav>
       </div>
     </header>
 
     <div class="page-body workbench-body">
-      <q-card flat class="page-tab-card workbench-tab-card">
+      <!-- <q-card flat class="page-tab-card workbench-tab-card">
         <q-tabs
           v-model="activeTab"
           align="left"
@@ -722,8 +729,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
           <q-tab name="review" icon="fact_check" label="審核案件" />
         </q-tabs>
         <q-separator />
-      </q-card>
-
+      </q-card> -->
       <div class="workbench-grid">
         <div class="workbench-main">
           <q-tab-panels v-model="activeTab" animated class="workbench-panels bg-transparent">
@@ -838,7 +844,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   <q-btn outline color="primary" label="清空條件" no-caps icon="refresh" @click="resetQuery" />
                   <span class="workbench-query-hint text-caption text-grey-7">
                     <q-icon name="info_outline" size="16px" class="q-mr-xs" />
-                    點擊保單編號可查看詳細資料
+                    點擊保單編號可查看詳細資料 / 安排約訪
                   </span>
                 </div>
 
@@ -942,7 +948,6 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   <p class="page-card__kicker">POL_APP_UPD</p>
                   <div class="page-card__title">修改 RETURN 退回案件</div>
                 </div>
-                <q-btn outline color="primary" label="檢查重複投保" no-caps icon="warning_amber" @click="runDuplicateCheck(editForm, editForm.applicationId)" />
               </div>
 
               <q-banner v-if="!canEdit" rounded class="bg-amber-1 text-brown-8 q-mt-md">此功能僅開放 APPLICANT 使用。</q-banner>
@@ -1063,9 +1068,9 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
         </div>
 
         <aside class="workbench-aside">
-          <q-card flat class="page-card page-card--accent workbench-insight">
+          <q-card flat class="page-card page-card--accent workbench-insight workbench-insight--rules">
             <q-card-section>
-              <div class="text-subtitle1 text-weight-bold q-mb-md text-primary">即時規則提示</div>
+              <div class="text-subtitle1 text-weight-bold q-mb-md workbench-insight__title">即時規則提示</div>
               <div class="hint-row"><span class="hint-label">保費比例</span><span>{{ premiumRatioHint }}</span></div>
               <div class="hint-row"><span class="hint-label">核保風險等級</span><span>{{ riskLevelHint }}</span></div>
               <div class="hint-row"><span class="hint-label">重複投保預警</span><span>{{ duplicateWarning }}</span></div>
@@ -1073,10 +1078,10 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
             </q-card-section>
           </q-card>
 
-          <q-card flat class="page-card page-card--accent workbench-insight">
+          <q-card flat class="page-card page-card--accent workbench-insight workbench-insight--products">
             <q-card-section>
               <div class="row items-center no-wrap q-mb-md">
-                <div class="text-subtitle1 text-weight-bold text-primary col">商品參考</div>
+                <div class="text-subtitle1 text-weight-bold workbench-insight__title col">商品參考</div>
                 <q-btn
                   v-if="hasMoreProducts"
                   flat
@@ -1138,24 +1143,121 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
 
 <style scoped>
 .workbench-page {
-  --workbench-accent: #48bb78;
-  --workbench-aside-width: 240px;
+  --wb-primary: #48bb78;
+  --wb-primary-light: #68d391;
+  --wb-primary-pale: #f0fff4;
+  --wb-primary-dark: #38a169;
+  --wb-primary-deep: #2f855a;
+  --wb-ink: #1a202c;
+  --wb-muted: #64748b;
+  --wb-surface: #ffffff;
+  --wb-surface-muted: #f7faf9;
+  --wb-border: #d8e8de;
+  --wb-accent-blue: #3182ce;
+  --wb-accent-blue-deep: #2c5282;
+  --wb-aside-width: 260px;
+  background: linear-gradient(180deg, #f4fbf7 0%, #f8fafc 120px);
 }
 
-.workbench-hero__grid {
-  display: grid;
-  grid-template-columns: 1.6fr 1fr;
-  gap: 24px;
-  align-items: end;
+.workbench-hero__inner {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  max-width: 1120px;
+}
+
+.workbench-hero__copy {
+  max-width: 640px;
+}
+
+.workbench-hero__subtitle {
+  max-width: 52ch;
+  line-height: 1.55;
 }
 
 .workbench-eyebrow {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.6875rem;
   font-weight: 700;
+}
+
+.workbench-workflow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.workbench-workflow__step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 12px;
+  background: rgba(72, 187, 120, 0.14);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+
+.workbench-workflow__step:hover {
+  background: rgba(72, 187, 120, 0.24);
+  border-color: rgba(255, 255, 255, 0.45);
+  transform: translateY(-1px);
+}
+
+.workbench-workflow__step--active {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: var(--wb-primary);
+  color: var(--wb-ink);
+  box-shadow: 0 8px 24px rgba(47, 133, 90, 0.22);
+}
+
+.workbench-workflow__step--active .workbench-workflow__icon {
+  background: linear-gradient(135deg, var(--wb-primary) 0%, var(--wb-primary-dark) 100%);
+  color: #fff;
+}
+
+.workbench-workflow__step--active .workbench-workflow__desc {
+  color: var(--wb-muted);
+}
+
+.workbench-workflow__icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.workbench-workflow__step:not(.workbench-workflow__step--active) .workbench-workflow__icon {
+  background: rgba(44, 82, 130, 0.35);
+}
+
+.workbench-workflow__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.workbench-workflow__label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.workbench-workflow__desc {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.3;
 }
 
 .workbench-body {
@@ -1164,20 +1266,29 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
 
 .workbench-tab-card {
   margin-bottom: 16px;
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
+  border: 1px solid var(--wb-border);
+  border-top: 3px solid var(--wb-primary);
+  box-shadow: 0 4px 16px rgba(72, 187, 120, 0.1);
+  background: var(--wb-surface);
 }
 
 .workbench-tabs :deep(.q-tab) {
-  min-height: 48px;
-  padding: 0 20px;
+  min-height: 50px;
+  padding: 0 22px;
   font-weight: 600;
+  color: var(--wb-muted);
+}
+
+.workbench-tabs :deep(.q-tab--active) {
+  color: var(--wb-primary-dark);
 }
 
 .workbench-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--workbench-aside-width);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) var(--wb-aside-width);
+  gap: 18px;
   align-items: start;
 }
 
@@ -1190,7 +1301,9 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
 }
 
 .workbench-panel {
-  border-radius: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--wb-border);
+  box-shadow: 0 2px 10px rgba(72, 187, 120, 0.06);
 }
 
 .form-grid {
@@ -1208,42 +1321,57 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
   gap: 4px;
   align-content: center;
   padding: 10px 14px;
-  border-radius: 8px;
-  background: #f0fff4;
+  border-radius: 10px;
+  background: var(--wb-primary-pale);
   border: 1px solid #c6f6d5;
 }
 
 .workbench-aside {
   display: grid;
-  gap: 12px;
-  width: var(--workbench-aside-width);
-  max-width: var(--workbench-aside-width);
+  gap: 14px;
+  width: var(--wb-aside-width);
+  max-width: var(--wb-aside-width);
   font-size: 0.875rem;
 }
 
 .workbench-insight {
-  border-radius: 12px;
-  border-top: 3px solid var(--workbench-accent);
+  border-radius: 14px;
+  border: 1px solid var(--wb-border);
+  background: var(--wb-surface);
+  box-shadow: 0 2px 8px rgba(72, 187, 120, 0.06);
+}
+
+.workbench-insight--rules {
+  border-left: 4px solid var(--wb-primary);
+  background: linear-gradient(135deg, #ffffff 0%, var(--wb-primary-pale) 100%);
+}
+
+.workbench-insight--products {
+  border-left: 4px solid var(--wb-accent-blue);
+  background: linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%);
 }
 
 .workbench-insight :deep(.q-card__section) {
-  padding: 12px 14px;
+  padding: 14px 16px;
 }
 
-.workbench-insight .text-subtitle1 {
-  font-size: 0.95rem;
+.workbench-insight .text-subtitle1,
+.workbench-insight__title {
+  font-size: 0.9375rem;
   margin-bottom: 8px;
+  color: var(--wb-ink);
 }
 
 .workbench-doc-card {
-  background: #f7fafc;
+  background: var(--wb-primary-pale);
+  border-color: #c6f6d5;
 }
 
 .hint-row {
   display: grid;
   gap: 4px;
-  padding: 8px 0;
-  border-bottom: 1px solid #d8dee6;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--wb-border);
 }
 
 .hint-row--last {
@@ -1251,8 +1379,8 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
 }
 
 .hint-label {
-  font-size: 11px;
-  color: #718096;
+  font-size: 0.6875rem;
+  color: var(--wb-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-weight: 600;
@@ -1268,7 +1396,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
 }
 
 .workbench-table :deep(thead tr) {
-  background: #f0fff4;
+  background: var(--wb-primary-pale);
 }
 
 .workbench-table :deep(.q-table tbody td) {
@@ -1278,12 +1406,13 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
 .workbench-table :deep(.q-table thead th) {
   font-size: 0.85rem;
   font-weight: 700;
+  color: var(--wb-ink);
 }
 
 .history-dialog-body {
   min-height: 160px;
   padding: 16px 20px 20px;
-  background: #fafbfc;
+  background: var(--wb-surface-muted);
 }
 
 .history-dialog-card {
@@ -1291,13 +1420,13 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
   max-width: 95vw;
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid #cbd5e0;
+  border: 1px solid var(--wb-border);
   box-shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
 }
 
 .history-dialog-card__header {
   padding: 18px 20px 14px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8faf9 100%);
+  background: linear-gradient(180deg, #ffffff 0%, var(--wb-surface-muted) 100%);
 }
 
 .history-dialog-card__policy-no {
@@ -1316,7 +1445,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
   padding: 0;
   border: none;
   background: none;
-  color: var(--q-primary);
+  color: var(--wb-primary-dark);
   font-weight: 600;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.8125rem;
@@ -1326,7 +1455,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
 }
 
 .workbench-policy-link:hover {
-  color: #2f855a;
+  color: #276749;
 }
 
 .workbench-product-list {
@@ -1335,13 +1464,27 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
 }
 
 .workbench-product-more {
-  border-top: 1px dashed #cbd5e0;
+  border-top: 1px dashed var(--wb-border);
 }
 
 @media (max-width: 1100px) {
-  .workbench-hero__grid,
+  .workbench-workflow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .workbench-grid,
   .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workbench-aside {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .workbench-workflow {
     grid-template-columns: 1fr;
   }
 }
