@@ -794,7 +794,7 @@ function viewPdf(path: string | undefined) {
 
   // 2. 如果路徑是 /uploads/...，直接加上後端 Base URL
   // 請確認 import.meta.env.VITE_API_BASE_URL 有值
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8085';
   
   // 組合網址：確保中間只有一個斜線
   const cleanBase = baseUrl.replace(/\/$/, '');

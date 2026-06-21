@@ -1,60 +1,71 @@
-import { computed, ref } from 'vue'
-import type { MyTaskItem, MyTaskSearchFilter } from '@/types/task'
+import { ref, computed } from 'vue'
+import { fetchIncompleteApplications } from '@/api/policyApplication'
+import type { PolicyRecord } from '@/types/policyApplication'
 
-const MOCK_TASKS: MyTaskItem[] = [
-  { taskNo: 'T-001', taskName: 'POL-2026-002 核保補件追蹤', status: 'pending' },
-  { taskNo: 'T-002', taskName: 'POL-2026-003 健檢報告催收', status: 'in_progress' },
-  { taskNo: 'T-003', taskName: '王小明 約訪確認', status: 'pending' },
-  { taskNo: 'T-004', taskName: '旅平險新件審核', status: 'done' },
-]
+const STATUS_LABEL: Record<string, string> = {
+  APPLIED:  '待業務審核',
+  RETURNED: '已退回',
+  PENDING:  '待主管審核',
+}
 
-function emptyFilter(): MyTaskSearchFilter {
-  return { keyword: '', status: '' }
+const STATUS_COLOR: Record<string, string> = {
+  APPLIED:  'orange',
+  RETURNED: 'red',
+  PENDING:  'blue',
 }
 
 export function useMyTasks() {
-  const filter = ref<MyTaskSearchFilter>(emptyFilter())
-  const tasks = ref<MyTaskItem[]>([...MOCK_TASKS])
+  const tasks = ref<PolicyRecord[]>([])
   const isLoading = ref(false)
+  const errorMessage = ref('')
+  const keyword = ref('')
+  const statusFilter = ref('')
 
-  const pendingCount = computed(
-    () => tasks.value.filter((t) => t.status !== 'done').length,
-  )
+  const pendingCount = computed(() => tasks.value.length)
 
   const filteredTasks = computed(() => {
-    return tasks.value.filter((task) => {
-      if (filter.value.keyword) {
-        const kw = filter.value.keyword.toLowerCase()
-        if (
-          !task.taskNo.toLowerCase().includes(kw) &&
-          !task.taskName.toLowerCase().includes(kw)
-        ) {
-          return false
-        }
+    return tasks.value.filter((t) => {
+      if (keyword.value) {
+        const kw = keyword.value.toLowerCase()
+        const matchId = t.APPLICATION_ID?.toLowerCase().includes(kw)
+        const matchName = t.INSURED_NAME?.toLowerCase().includes(kw) ||
+                          t.APPLICANT_NAME?.toLowerCase().includes(kw)
+        const matchProduct = t.PRODUCT_NAME?.toLowerCase().includes(kw)
+        if (!matchId && !matchName && !matchProduct) return false
       }
-      if (filter.value.status && task.status !== filter.value.status) return false
+      if (statusFilter.value && t.APPLICATION_STATUS !== statusFilter.value) return false
       return true
     })
   })
 
-  function search() {
+  async function search() {
     isLoading.value = true
-    setTimeout(() => {
+    errorMessage.value = ''
+    try {
+      tasks.value = await fetchIncompleteApplications()
+    } catch (err: unknown) {
+      errorMessage.value = err instanceof Error ? err.message : '載入失敗'
+    } finally {
       isLoading.value = false
-    }, 200)
+    }
   }
 
   function resetFilter() {
-    filter.value = emptyFilter()
+    keyword.value = ''
+    statusFilter.value = ''
   }
 
   return {
-    filter,
     tasks,
     filteredTasks,
     pendingCount,
     isLoading,
+    errorMessage,
+    keyword,
+    statusFilter,
     search,
     resetFilter,
+    STATUS_LABEL,
+    STATUS_COLOR,
   }
 }

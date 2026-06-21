@@ -27,3 +27,8 @@ export async function reviewPolicyApplication(payload: Record<string, unknown>) 
   const response = await requestJson<PolicyReviewResult>(`${BASE}/review`, 'POST', payload)
   return response.DATA
 }
+
+export async function fetchIncompleteApplications(): Promise<PolicyRecord[]> {
+  const response = await requestJson<PolicyRecord[]>(`${BASE}/incomplete`, 'GET')
+  return response.DATA ?? []
+}
