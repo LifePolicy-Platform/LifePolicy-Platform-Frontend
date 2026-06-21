@@ -28,9 +28,9 @@ export const sidebarNavItems: SidebarNavItem[] = [
   // 約訪管理
   { group: '約訪管理', groupOrder: 3, path: '/visit-mgmt/reschedule', label: '重新安排約訪', title: '重新安排約訪', icon: 'schedule' },
 
-  // 理賠管理
-  { group: '理賠管理', groupOrder: 4, path: '/claims', label: '理賠查詢', title: '理賠查詢', icon: 'receipt_long', disabled: true },
-  { group: '理賠管理', groupOrder: 4, path: '/claims/review', label: '理賠審核', title: '理賠審核', icon: 'rule', disabled: true },
+  // 理賠作業
+  { group: '理賠作業', groupOrder: 3, path: '/claim/ClaimManagement', label: '理賠管理', title: '理賠管理', icon: 'receipt_long'},
+  { group: '理賠作業', groupOrder: 3, path: '/claim/ClaimAuditManager', label: '理賠審核', title: '理賠審核', icon: 'rule'},
 
   // 商品管理
   { group: '商品管理', groupOrder: 5, path: '/products', label: '商品維護', title: '商品維護', icon: 'inventory_2' },

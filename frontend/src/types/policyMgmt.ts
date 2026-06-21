@@ -6,6 +6,9 @@ export type PolicyStatus =
   | 'rejected'
   | 'expired'
 
+export type ProductStatus = 'ACTIVE' | 'INACTIVE'
+
+export type ProductType = 'LIFE' | 'HEALTH' | 'ACCIDENT' | 'ANNUITY' | 'TRAVEL'
 export interface PolicyListItem {
   policyNo: string
   productName: string
