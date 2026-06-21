@@ -1,4 +1,5 @@
 import { requestJson } from '@/api/http'
+import http from '@/api/http' // 引用你原本的 http instance
 
 export interface ClaimFilter {
   status: string
@@ -50,4 +51,25 @@ export function updateClaimApi(claimNo: string, data: ClaimModel) {
 /** 刪除案件 */
 export function deleteClaimApi(claimNo: string) {
   return requestJson(`/api/admin/claim/${claimNo}`, 'DELETE')
+}
+
+/** 取得下拉選單資料 */
+export function fetchMemberOptions() {
+  return requestJson<any[]>('/api/admin/claim/member-options', 'GET')
+}
+export function fetchPolicyOptions() {
+  return requestJson<any[]>('/api/admin/claim/policy-options', 'GET')
+}
+export function fetchAgentOptions() {
+  return requestJson<any[]>('/api/admin/claim/agent-options', 'GET')
+}
+
+/** 檔案上傳 (特殊處理) */
+export function uploadFileApi(file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  // 這裡直接使用 http instance，因為它會自動帶入 Token，且 headers 會由瀏覽器自動處理 multipart
+  return http.post('/api/admin/claim/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
 }

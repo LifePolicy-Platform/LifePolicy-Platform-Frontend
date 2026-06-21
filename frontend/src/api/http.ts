@@ -91,7 +91,7 @@ export async function requestJson<T>(
     return body
   } catch (error) {
     if (axios.isAxiosError(error) && !error.response) {
-      throw new Error('無法連線後端，請確認後端服務已啟動（port 8083）')
+      throw new Error('無法連線後端，請確認後端服務已啟動（port 8080）')
     }
     throw error
   }
