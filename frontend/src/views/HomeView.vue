@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import DashboardBarChart from '@/components/dashboard/DashboardBarChart.vue'
 import DashboardLineChart from '@/components/dashboard/DashboardLineChart.vue'
 import DashboardStatCard from '@/components/dashboard/DashboardStatCard.vue'
+import PageHero from '@/components/layout/PageHero.vue'
 import { useDashboard } from '@/composables/useDashboard'
 
 const {
@@ -25,12 +26,11 @@ const achievementGap = computed(() =>
 
 <template>
   <section class="home-page">
-    <header class="home-hero">
-      <div class="home-hero__inner">
-        <h2 class="home-title">首頁 Dashboard</h2>
-        <p class="home-subtitle">今年業績概況、投保目標與保單申請趨勢</p>
-      </div>
-    </header>
+    <PageHero
+      compact
+      title="首頁 Dashboard"
+      subtitle="今年業績概況、投保目標與保單申請趨勢"
+    />
 
     <div class="home-body">
       <q-banner v-if="errorMessage" rounded class="bg-red-1 text-red-8">
@@ -127,40 +127,6 @@ const achievementGap = computed(() =>
   background: var(--dash-bg);
 }
 
-.home-hero {
-  flex: 0 0 auto;
-  width: 100%;
-  min-height: clamp(108px, 13vh, 148px);
-  padding: calc(var(--chrome-height) + 6px) 20px 44px;
-  background: linear-gradient(
-    135deg,
-    var(--notus-green-dark) 0%,
-    var(--notus-green) 45%,
-    var(--notus-green-light) 75%
-  );
-}
-
-.home-hero__inner {
-  max-width: var(--home-content-width);
-  margin: 0 auto;
-  padding: 0 16px;
-  text-align: left;
-}
-
-.home-title {
-  margin: 0;
-  color: #ffffff;
-  font-size: 1.45rem;
-  font-weight: 700;
-}
-
-.home-subtitle {
-  margin: 6px 0 0;
-  color: rgba(255, 255, 255, 0.88);
-  font-size: 0.9rem;
-  font-weight: 500;
-}
-
 .home-body {
   flex: 1 1 auto;
   width: 100%;
@@ -214,11 +180,6 @@ const achievementGap = computed(() =>
 }
 
 @media (max-width: 760px) {
-  .home-hero {
-    min-height: 100px;
-    padding: calc(var(--chrome-height) + 4px) 16px 36px;
-  }
-
   .home-body {
     margin-top: -24px;
     padding: 0 14px 20px;
