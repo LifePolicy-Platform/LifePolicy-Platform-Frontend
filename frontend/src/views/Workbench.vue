@@ -3,7 +3,7 @@ import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { useQuasar } from 'quasar'
 import { useAuthStore } from '@/stores/auth'
 import { useRoute, useRouter } from 'vue-router'
-import type { ProductListItem } from '@/types/productMgmt'
+import type { ProductListItem1 } from '@/types/productMgmt'
 import type { PolicyRecord } from '@/types/policyApplication'
 import type { PolicyHistoryItem } from '@/types/policyMgmt'
 import PolicyHistoryTable from '@/components/policy/PolicyHistoryTable.vue'
@@ -32,7 +32,7 @@ const $q = useQuasar()
 const authStore = useAuthStore()
 
 // ---- 商品清單 ----
-const products = ref<ProductListItem[]>([])
+const products = ref<ProductListItem1[]>([])
 const productsExpanded = ref(false)
 const PRODUCT_PREVIEW_COUNT = 5
 const createProductOptions = ref<ProductOption[]>([])
@@ -1115,7 +1115,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
     </div>
   </section>
 
-  <q-dialog v-model="historyDialogOpen" persistent>
+  <q-dialog v-model="historyDialogOpen" no-backdrop-dismiss>
     <q-card class="history-dialog-card">
       <q-card-section class="history-dialog-card__header row items-start no-wrap q-pb-sm">
         <q-avatar rounded color="primary" text-color="white" icon="history" size="40px" class="q-mr-md" />
