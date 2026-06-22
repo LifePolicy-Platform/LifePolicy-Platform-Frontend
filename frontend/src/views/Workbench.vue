@@ -104,13 +104,6 @@ const genderOptions = [
   { label: 'MALE', value: 'MALE' },
   { label: 'FEMALE', value: 'FEMALE' }
 ]
-const relationshipOptions = [
-  { label: 'SELF', value: 'SELF' },
-  { label: 'SPOUSE', value: 'SPOUSE' },
-  { label: 'CHILD', value: 'CHILD' },
-  { label: 'PARENT', value: 'PARENT' },
-  { label: 'OTHER', value: 'OTHER' }
-]
 const statusOptions = [
   { label: '全部', value: '' },
   { label: APPLICATION_STATUS_LABEL.PENDING, value: 'PENDING' },
@@ -184,7 +177,6 @@ function blankApplication() {
     applicantName: '',
     applicantGender: 'MALE',
     applicantBirthdate: '',
-    relationshipToInsured: 'SELF',
     insuredIdNo: '',
     insuredName: '',
     insuredGender: 'MALE',
@@ -233,8 +225,8 @@ const reviewTargetOptions = computed(() => {
 })
 
 const reviewStageTitle = computed(() => {
-  if (reviewForm.sourceStatus === 'SUBMIT') return '業務審核（SUBMIT 關卡）'
-  if (reviewForm.sourceStatus === 'PENDING') return '主管審核（PENDING 關卡）'
+  if (reviewForm.sourceStatus === 'SUBMIT') return '業務審核'
+  if (reviewForm.sourceStatus === 'PENDING') return '主管審核'
   return '審核作業'
 })
 
@@ -326,7 +318,8 @@ const riskLevelHint = computed(() => {
   const premium = Number(hintForm.value.annualPremium || 0)
   const ratio = sumInsured > 0 ? premium / sumInsured : 0
   if (!hintForm.value.insuredBirthdate) return '尚未判定'
-  return evaluateRiskLevel(hintForm.value.insuredBirthdate, hintForm.value.relationshipToInsured, sumInsured, ratio)
+  const relationship = resolveRelationship(hintForm.value.applicantIdNo, hintForm.value.insuredIdNo)
+  return evaluateRiskLevel(hintForm.value.insuredBirthdate, relationship, sumInsured, ratio)
 })
 
 const duplicateWarning = ref('尚未檢查')
@@ -346,6 +339,17 @@ function calculateAge(dateString: string): number {
   const monthDiff = today.getMonth() - birthday.getMonth()
   if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthday.getDate())) age -= 1
   return age
+}
+
+function findProduct(productCode: string): ProductListItem1 | undefined {
+  return products.value.find((product) => product.code === productCode)
+}
+
+/** 依身分證是否相同推導與被保人關係（後端仍必填此欄位） */
+function resolveRelationship(applicantIdNo: string, insuredIdNo: string): string {
+  const applicant = applicantIdNo.trim().toUpperCase()
+  const insured = insuredIdNo.trim().toUpperCase()
+  return applicant && insured && applicant === insured ? 'SELF' : 'OTHER'
 }
 
 function evaluateRiskLevel(insuredBirthdate: string, relationship: string, sumInsured: number, ratio: number): string {
@@ -388,6 +392,11 @@ function validateApplication(form: ReturnType<typeof blankApplication>): string[
   if (form.applicantBirthdate && new Date(form.applicantBirthdate) > today) errors.push('投保人生日不可晚於今天')
   if (form.insuredBirthdate && new Date(form.insuredBirthdate) > today) errors.push('被保人生日不可晚於今天')
 
+  if (form.applicantBirthdate) {
+    const applicantAge = calculateAge(form.applicantBirthdate)
+    if (applicantAge < 18) errors.push('投保人須年滿 18 歲')
+  }
+
   if (!form.productCode) errors.push('請選擇商品代碼')
   if (!phonePattern.test(form.contactPhone)) errors.push('聯絡電話需為 09 開頭的 10 碼手機號碼')
 
@@ -396,6 +405,22 @@ function validateApplication(form: ReturnType<typeof blankApplication>): string[
   if (sumInsured <= 0) errors.push('保額需大於 0')
   if (annualPremium <= 0) errors.push('年繳保費需大於 0')
   if (sumInsured > 0 && annualPremium / sumInsured > 0.05) errors.push('年繳保費不可超過保額的 5%')
+  if (annualPremium > 1000000) errors.push('年繳保費不可超過 100 萬')
+
+  const product = findProduct(form.productCode)
+  if (product) {
+    if (form.insuredBirthdate) {
+      const insuredAge = calculateAge(form.insuredBirthdate)
+      if (insuredAge < product.minInsuredAge || insuredAge > product.maxInsuredAge) {
+        errors.push(`被保人年齡須介於 ${product.minInsuredAge}～${product.maxInsuredAge} 歲`)
+      }
+    }
+    if (sumInsured > 0 && (sumInsured < product.minSumInsured || sumInsured > product.maxSumInsured)) {
+      errors.push(
+        `保額須介於 ${product.minSumInsured.toLocaleString('zh-TW')}～${product.maxSumInsured.toLocaleString('zh-TW')}`,
+      )
+    }
+  }
 
   return errors
 }
@@ -404,13 +429,14 @@ function buildPayload(form: ReturnType<typeof blankApplication>) {
   const sumInsured = Number(form.sumInsured || 0)
   const annualPremium = Number(form.annualPremium || 0)
   const premiumRatio = sumInsured > 0 ? annualPremium / sumInsured : 0
+  const relationshipToInsured = resolveRelationship(form.applicantIdNo, form.insuredIdNo)
 
   return {
     APPLICANT_ID_NO: form.applicantIdNo.trim(),
     APPLICANT_NAME: form.applicantName.trim(),
     APPLICANT_GENDER: form.applicantGender,
     APPLICANT_BIRTHDATE: form.applicantBirthdate,
-    RELATIONSHIP_TO_INSURED: form.relationshipToInsured,
+    RELATIONSHIP_TO_INSURED: relationshipToInsured,
     INSURED_ID_NO: form.insuredIdNo.trim(),
     INSURED_NAME: form.insuredName.trim(),
     INSURED_GENDER: form.insuredGender,
@@ -419,7 +445,7 @@ function buildPayload(form: ReturnType<typeof blankApplication>) {
     SUM_INSURED: sumInsured,
     ANNUAL_PREMIUM: annualPremium,
     CONTACT_PHONE: form.contactPhone.trim(),
-    RISK_LEVEL: evaluateRiskLevel(form.insuredBirthdate, form.relationshipToInsured, sumInsured, premiumRatio),
+    RISK_LEVEL: evaluateRiskLevel(form.insuredBirthdate, relationshipToInsured, sumInsured, premiumRatio),
     CREATED_BY: authStore.currentUser?.USERNAME ?? ''
   }
 }
@@ -524,7 +550,6 @@ function loadRecordToEdit(record: PolicyRecord) {
     applicantName: record.APPLICANT_NAME || '',
     applicantGender: record.APPLICANT_GENDER || 'MALE',
     applicantBirthdate: record.APPLICANT_BIRTHDATE || '',
-    relationshipToInsured: record.RELATIONSHIP_TO_INSURED || 'SELF',
     insuredIdNo: record.INSURED_ID_NO || '',
     insuredName: record.INSURED_NAME || '',
     insuredGender: record.INSURED_GENDER || 'MALE',
@@ -616,7 +641,7 @@ async function handleReview() {
     return
   }
   if (requiresRejectionReason.value && !reviewForm.rejectionReason.trim()) {
-    notifyError(reviewForm.targetStatus === 'RETURN' ? '業務駁回時必須填寫原因' : '主管拒絕時必須填寫原因')
+    notifyError(reviewForm.targetStatus === 'RETURN' ? '業務退件時必須填寫原因' : '主管駁回時必須填寫原因')
     return
   }
   if (showDocumentCheck.value && !areDocumentsConfirmed()) {
@@ -739,7 +764,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
               <q-card-section>
               <div class="page-card__header">
                 <div>
-                  <p class="page-card__kicker">POL_APP_CMD</p>
+                  <p class="page-card__kicker">New policy application</p>
                   <div class="page-card__title">新增投保申請</div>
                 </div>
                 <q-btn outline color="primary" label="檢查重複投保" no-caps icon="warning_amber" @click="runDuplicateCheck(createForm, null)" />
@@ -751,15 +776,15 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
 
               <template v-else>
                 <div class="form-grid q-mt-md">
-                  <q-input v-model="createForm.applicantIdNo" label="投保人身分證" outlined dense maxlength="10" />
                   <q-input v-model="createForm.applicantName" label="投保人姓名" outlined dense maxlength="50" />
+                  <q-input v-model="createForm.applicantIdNo" label="投保人身分證" outlined dense maxlength="10" />
                   <q-select v-model="createForm.applicantGender" label="投保人性別" outlined dense :options="genderOptions" emit-value map-options />
                   <q-input v-model="createForm.applicantBirthdate" label="投保人生日" outlined dense type="date" stack-label />
-                  <q-select v-model="createForm.relationshipToInsured" label="關係" outlined dense :options="relationshipOptions" emit-value map-options />
-                  <q-input v-model="createForm.insuredIdNo" label="被保人身分證" outlined dense maxlength="10" />
                   <q-input v-model="createForm.insuredName" label="被保人姓名" outlined dense maxlength="50" />
+                  <q-input v-model="createForm.insuredIdNo" label="被保人身分證" outlined dense maxlength="10" />
                   <q-select v-model="createForm.insuredGender" label="被保人性別" outlined dense :options="genderOptions" emit-value map-options />
                   <q-input v-model="createForm.insuredBirthdate" label="被保人生日" outlined dense type="date" stack-label />
+                  <q-input v-model="createForm.contactPhone" label="聯絡電話" outlined dense maxlength="10" />
                   <q-select
                     v-model="createForm.productCode"
                     label="商品代碼"
@@ -780,9 +805,8 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                       </q-item>
                     </template>
                   </q-select>
-                  <q-input v-model="createForm.sumInsured" label="保額" outlined dense type="number" />
-                  <q-input v-model="createForm.annualPremium" label="年繳保費" outlined dense type="number" />
-                  <q-input v-model="createForm.contactPhone" label="聯絡電話" outlined dense maxlength="10" />
+                  <q-input v-model="createForm.sumInsured" label="保額" outlined dense stack-label type="number" />
+                  <q-input v-model="createForm.annualPremium" label="年繳保費" outlined dense stack-label type="number" />
                 </div>
                 <div class="q-mt-md">
                   <q-btn color="primary" unelevated label="送出新增" no-caps icon="send" :loading="submitting" @click="handleCreate" />
@@ -798,8 +822,8 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
               <q-card-section>
               <div class="page-card__header">
                 <div>
-                  <p class="page-card__kicker">POL_APP_QRY</p>
-                  <div class="page-card__title">查詢投保申請</div>
+                  <p class="page-card__kicker">Search Policy Cases</p>
+                  <div class="page-card__title">查詢保單案件</div>
                 </div>
               </div>
 
@@ -945,8 +969,8 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
               <q-card-section>
               <div class="page-card__header">
                 <div>
-                  <p class="page-card__kicker">POL_APP_UPD</p>
-                  <div class="page-card__title">修改 RETURN 退回案件</div>
+                  <p class="page-card__kicker">Revise Returned Cases</p>
+                  <div class="page-card__title">修改退回案件</div>
                 </div>
               </div>
 
@@ -961,7 +985,6 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   <q-input v-model="editForm.applicantName" label="投保人姓名" outlined dense maxlength="50" />
                   <q-select v-model="editForm.applicantGender" label="投保人性別" outlined dense :options="genderOptions" emit-value map-options />
                   <q-input v-model="editForm.applicantBirthdate" label="投保人生日" outlined dense type="date" stack-label />
-                  <q-select v-model="editForm.relationshipToInsured" label="關係" outlined dense :options="relationshipOptions" emit-value map-options />
                   <q-input v-model="editForm.insuredIdNo" label="被保人身分證" outlined dense maxlength="10" />
                   <q-input v-model="editForm.insuredName" label="被保人姓名" outlined dense maxlength="50" />
                   <q-select v-model="editForm.insuredGender" label="被保人性別" outlined dense :options="genderOptions" emit-value map-options />
@@ -986,8 +1009,8 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                       </q-item>
                     </template>
                   </q-select>
-                  <q-input v-model="editForm.sumInsured" label="保額" outlined dense type="number" />
-                  <q-input v-model="editForm.annualPremium" label="年繳保費" outlined dense type="number" />
+                  <q-input v-model="editForm.sumInsured" label="保額" outlined dense stack-label type="number" />
+                  <q-input v-model="editForm.annualPremium" label="年繳保費" outlined dense stack-label type="number" />
                   <q-input v-model="editForm.contactPhone" label="聯絡電話" outlined dense maxlength="10" />
                 </div>
                 <div class="q-mt-md">
@@ -1004,7 +1027,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
               <q-card-section>
               <div class="page-card__header">
                 <div>
-                  <p class="page-card__kicker">POL_APP_APRV</p>
+                  <p class="page-card__kicker">Review Policy Cases</p>
                   <div class="page-card__title">{{ reviewStageTitle }}</div>
                 </div>
               </div>
@@ -1013,7 +1036,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                 此功能僅開放 APPLICANT（業務審核）或 REVIEWER（主管審核）使用。
               </q-banner>
               <q-banner v-else-if="!reviewLoaded" rounded class="bg-amber-1 text-brown-8 q-mt-md">
-                請先從查詢結果帶入待審案件：業務審核 SUBMIT、主管審核 PENDING。
+                請先從查詢結果帶入待審案件：業務審核 、主管審核。
               </q-banner>
               <q-banner v-else-if="!canPerformLoadedReview" rounded class="bg-amber-1 text-brown-8 q-mt-md">
                 您沒有權限審核此狀態的案件，請重新從查詢結果帶入。
@@ -1042,11 +1065,11 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                     v-if="requiresRejectionReason"
                     v-model="reviewForm.rejectionReason"
                     class="full-span"
-                    :label="reviewForm.targetStatus === 'RETURN' ? '業務駁回原因' : '主管拒絕原因'"
+                    :label="reviewForm.targetStatus === 'RETURN' ? '退件原因' : '駁回原因'"
                     outlined
                     type="textarea"
                     rows="3"
-                    :hint="reviewForm.targetStatus === 'RETURN' ? '業務駁回時請填寫原因' : '主管拒絕時請填寫原因'"
+                    :hint="reviewForm.targetStatus === 'RETURN' ? '業務退件時請填寫原因' : '主管駁回時請填寫原因'"
                   />
                 </div>
 
@@ -1098,7 +1121,8 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   <q-item-section>
                     <q-item-label class="text-weight-bold">{{ p.code }}</q-item-label>
                     <q-item-label>{{ p.name }}</q-item-label>
-                    <q-item-label caption>年齡 {{ p.minInsuredAge }}-{{ p.maxInsuredAge }}，保額 {{ p.minSumInsured }}-{{ p.maxSumInsured }}</q-item-label>
+                    <q-item-label caption>年齡 {{ p.minInsuredAge }}-{{ p.maxInsuredAge }}</q-item-label>
+                    <q-item-label caption>保額 {{ p.minSumInsured }}-{{ p.maxSumInsured }}</q-item-label>
                   </q-item-section>
                 </q-item>
               </q-list>
