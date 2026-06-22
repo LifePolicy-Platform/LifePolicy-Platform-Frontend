@@ -168,13 +168,14 @@ const router = createRouter({
     {
     path: '/claim/ClaimManagement',
     name: 'ClaimManagement',
-    // 💡 確保這裡的 import 路徑有補上 /claim/ 資料夾
     component: () => import('@/views/claim/ClaimManagement.vue'),
+    meta: { title: '理賠管理', label: '理賠管理', hasTopHero: true },
     },
     {
     path: '/claim/ClaimAuditManager',
     name: 'ClaimAuditManager',
     component: () => import('@/views/claim/ClaimAuditManager.vue'),
+    meta: { title: '理賠審核', label: '理賠審核', hasTopHero: true },
     }
   ],
 })

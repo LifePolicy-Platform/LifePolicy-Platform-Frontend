@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, reactive } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useQuasar } from 'quasar'
 import PageHero from '@/components/layout/PageHero.vue'
 import { useProductList } from '@/composables/useProductList'
@@ -21,6 +21,9 @@ const $q = useQuasar()
 const { filter, list, isLoading, errorMessage, reload, resetFilter } = useProductList()
 
 onMounted(() => reload())
+
+const activeCount = computed(() => list.value.filter((row) => row.status === 'ACTIVE').length)
+const inactiveCount = computed(() => list.value.filter((row) => row.status === 'INACTIVE').length)
 
 // ── Dialog ───────────────────────────────────────────────
 const dialogOpen = ref(false)
@@ -122,7 +125,6 @@ async function submitForm() {
   }
 }
 
-// ── Status toggle ─────────────────────────────────────────
 async function toggleStatus(row: ProductListItem) {
   try {
     if (row.status === 'ACTIVE') {
@@ -139,7 +141,7 @@ async function toggleStatus(row: ProductListItem) {
   }
 }
 
-// ── Table ─────────────────────────────────────────────────
+// ── Display helpers ───────────────────────────────────────
 function productTypeLabel(type: ProductType) {
   return PRODUCT_TYPE_LABEL[type] ?? type
 }
@@ -148,32 +150,46 @@ function productStatusLabel(status: ProductStatus) {
   return PRODUCT_STATUS_LABEL[status] ?? status
 }
 
+const PRODUCT_TYPE_COLOR: Record<ProductType, string> = {
+  LIFE: 'teal-6',
+  HEALTH: 'blue-6',
+  ACCIDENT: 'orange-7',
+  ANNUITY: 'purple-6',
+  TRAVEL: 'cyan-7',
+}
+
+function productTypeColor(type: ProductType) {
+  return PRODUCT_TYPE_COLOR[type] ?? 'blue-grey-5'
+}
+
+function productStatusColor(status: ProductStatus) {
+  return status === 'ACTIVE' ? 'positive' : 'grey-6'
+}
+
+function formatCurrency(value: number | null | undefined): string {
+  if (value == null) return '—'
+  return value.toLocaleString('zh-TW')
+}
+
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) return '—'
+  return value.slice(0, 16).replace('T', ' ')
+}
+
+function formatRange(min: number | null | undefined, max: number | null | undefined, unit = ''): string {
+  if (min == null && max == null) return '—'
+  return `${formatCurrency(min)} ~ ${formatCurrency(max)}${unit}`
+}
+
 const columns = [
-  { name: 'productCode', label: '商品代碼', field: 'productCode', align: 'left' as const },
-  { name: 'productName', label: '商品名稱', field: 'productName', align: 'left' as const },
+  { name: 'productCode', label: '商品代碼', field: 'productCode', align: 'left' as const, sortable: true },
+  { name: 'productName', label: '商品名稱', field: 'productName', align: 'left' as const, sortable: true },
   { name: 'productType', label: '類型', field: 'productType', align: 'left' as const },
-  { name: 'status', label: '狀態', field: 'status', align: 'left' as const },
-  {
-    name: 'minAmount',
-    label: '最低保額',
-    field: 'minAmount',
-    align: 'right' as const,
-    format: (v: number) => v != null ? v.toLocaleString() : '-',
-  },
-  {
-    name: 'maxAmount',
-    label: '最高保額',
-    field: 'maxAmount',
-    align: 'right' as const,
-    format: (v: number) => v != null ? v.toLocaleString() : '-',
-  },
-  {
-    name: 'createTime',
-    label: '建立日',
-    field: 'createTime',
-    align: 'left' as const,
-    format: (v: string) => (v ? v.slice(0, 16).replace('T', ' ') : ''),
-  },
+  { name: 'basePremium', label: '基本保費', field: 'basePremium', align: 'right' as const },
+  { name: 'amountRange', label: '保額區間', field: 'minAmount', align: 'right' as const },
+  { name: 'ageRange', label: '投保年齡', field: 'minAge', align: 'center' as const },
+  { name: 'status', label: '狀態', field: 'status', align: 'center' as const },
+  { name: 'createTime', label: '建立日', field: 'createTime', align: 'left' as const, sortable: true },
   { name: 'actions', label: '操作', field: 'actions', align: 'center' as const },
 ]
 
@@ -184,59 +200,89 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
 </script>
 
 <template>
-  <section class="page-with-hero">
+  <section class="page-with-hero product-list-page">
     <PageHero title="商品管理" subtitle="查詢、新增、修改商品資料" />
 
     <div class="page-body">
       <!-- 篩選列 -->
-      <q-card flat class="page-card q-mb-md">
+      <q-card flat class="page-card page-card--filter q-mb-md">
         <q-card-section>
           <div class="page-card__header q-mb-sm">
             <div>
-              <p class="page-card__kicker">FILTER</p>
+              <p class="page-card__kicker">PRODUCT FILTER</p>
               <div class="page-card__title">查詢條件</div>
+              <p class="page-card__desc">可依代碼、名稱、類型或狀態篩選商品</p>
             </div>
           </div>
-          <div class="row q-col-gutter-md items-end">
-            <div class="col-12 col-md-3">
-              <q-input v-model="filter.productCode" label="商品代碼" dense outlined clearable />
-            </div>
-            <div class="col-12 col-md-3">
-              <q-input v-model="filter.productName" label="商品名稱" dense outlined clearable />
-            </div>
-            <div class="col-12 col-md-2">
-              <q-select
-                v-model="filter.productType"
-                :options="typeOptions"
-                label="類型"
-                dense outlined emit-value map-options
-              />
-            </div>
-            <div class="col-12 col-md-2">
-              <q-select
-                v-model="filter.status"
-                :options="statusOptions"
-                label="狀態"
-                dense outlined emit-value map-options
-              />
-            </div>
-            <div class="col-12 col-md-2 flex items-center q-gutter-sm">
-              <q-btn color="primary" label="查詢" icon="search" :loading="isLoading" @click="reload" />
-              <q-btn flat label="清除" @click="resetFilter" />
-              <q-space />
-              <q-btn color="teal-7" icon="add" label="新增" no-caps @click="openCreate" />
-            </div>
+
+          <div class="product-filter-grid q-mt-md">
+            <q-input
+              v-model="filter.productCode"
+              label="商品代碼"
+              outlined
+              dense
+              clearable
+              placeholder="輸入代碼關鍵字"
+            />
+            <q-input
+              v-model="filter.productName"
+              label="商品名稱"
+              outlined
+              dense
+              clearable
+              placeholder="輸入名稱關鍵字"
+            />
+            <q-select
+              v-model="filter.productType"
+              :options="typeOptions"
+              label="商品類型"
+              outlined
+              dense
+              emit-value
+              map-options
+            />
+            <q-select
+              v-model="filter.status"
+              :options="statusOptions"
+              label="上架狀態"
+              outlined
+              dense
+              emit-value
+              map-options
+            />
+          </div>
+
+          <div class="q-mt-md row items-center wrap q-gutter-sm">
+            <q-btn
+              color="primary"
+              unelevated
+              label="執行查詢"
+              no-caps
+              icon="search"
+              :loading="isLoading"
+              @click="reload"
+            />
+            <q-btn
+              outline
+              color="primary"
+              label="清空條件"
+              no-caps
+              icon="refresh"
+              @click="resetFilter"
+            />
           </div>
         </q-card-section>
       </q-card>
 
-      <!-- 錯誤訊息 -->
       <q-banner v-if="errorMessage" rounded class="bg-red-1 text-red-8 q-mb-md">
+        <template #avatar>
+          <q-icon name="error_outline" color="red-8" />
+        </template>
         {{ errorMessage }}
       </q-banner>
 
       <!-- 商品列表 -->
-      <q-card flat class="page-card">
+      <q-card flat class="page-card page-card--data">
         <q-card-section>
           <div class="page-card__header q-mb-md">
             <div>
@@ -244,53 +290,146 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
               <div class="page-card__title">商品清單</div>
               <p class="page-card__desc">共 {{ list.length }} 筆結果</p>
             </div>
+            <div class="product-list-toolbar">
+              <div class="product-list-stats" aria-label="商品狀態統計">
+                <q-chip dense size="sm" color="positive" text-color="white" icon="check_circle">
+                  上架 {{ activeCount }}
+                </q-chip>
+                <q-chip dense size="sm" color="grey-5" text-color="white" icon="pause_circle">
+                  下架 {{ inactiveCount }}
+                </q-chip>
+              </div>
+              <q-btn
+                color="primary"
+                unelevated
+                icon="add"
+                label="新增商品"
+                no-caps
+                @click="openCreate"
+              />
+            </div>
           </div>
+
           <q-table
-            class="app-table"
+            class="app-table product-list-table"
             :rows="list"
             :columns="columns"
             row-key="productCode"
-            flat bordered
+            flat
+            bordered
+            dense
             :loading="isLoading"
-            no-data-label="查無商品"
+            hide-pagination
+            :rows-per-page-options="[0]"
+            no-data-label="查無符合條件的商品"
           >
+            <template #body-cell-productCode="props">
+              <q-td :props="props">
+                <span class="product-code">{{ props.row.productCode }}</span>
+              </q-td>
+            </template>
+
+            <template #body-cell-productName="props">
+              <q-td :props="props">
+                <div class="product-name-cell">
+                  <span class="product-name-cell__title">{{ props.row.productName }}</span>
+                  <span v-if="props.row.remark" class="product-name-cell__remark">{{ props.row.remark }}</span>
+                </div>
+              </q-td>
+            </template>
+
             <template #body-cell-productType="props">
               <q-td :props="props">
-                <q-chip dense size="sm" color="blue-grey-2" text-color="blue-grey-9">
+                <q-chip
+                  dense
+                  size="sm"
+                  :color="productTypeColor(props.row.productType)"
+                  text-color="white"
+                >
                   {{ productTypeLabel(props.row.productType) }}
                 </q-chip>
               </q-td>
             </template>
+
+            <template #body-cell-basePremium="props">
+              <q-td :props="props" class="text-right">
+                <span class="product-amount">{{ formatCurrency(props.row.basePremium) }}</span>
+              </q-td>
+            </template>
+
+            <template #body-cell-amountRange="props">
+              <q-td :props="props" class="text-right">
+                <span class="product-amount product-amount--muted">
+                  {{ formatRange(props.row.minAmount, props.row.maxAmount) }}
+                </span>
+              </q-td>
+            </template>
+
+            <template #body-cell-ageRange="props">
+              <q-td :props="props" class="text-center">
+                {{ props.row.minAge }} ~ {{ props.row.maxAge }} 歲
+              </q-td>
+            </template>
+
             <template #body-cell-status="props">
-              <q-td :props="props">
+              <q-td :props="props" class="text-center">
                 <q-chip
-                  dense size="sm"
-                  :color="props.row.status === 'active' ? 'positive' : 'grey'"
-                  text-color="white"
-                >
-                  <q-chip
                   dense
                   size="sm"
-                  :color="props.row.status === 'active' ? 'positive' : 'grey-5'"
+                  :color="productStatusColor(props.row.status)"
                   text-color="white"
                 >
                   {{ productStatusLabel(props.row.status) }}
                 </q-chip>
-                </q-chip>
               </q-td>
             </template>
+
+            <template #body-cell-createTime="props">
+              <q-td :props="props">
+                {{ formatDateTime(props.row.createTime) }}
+              </q-td>
+            </template>
+
             <template #body-cell-actions="props">
               <q-td :props="props">
-                <div class="q-gutter-xs">
-                  <q-btn size="sm" dense color="teal-7" label="修改" no-caps @click="openEdit(props.row)" />
+                <div class="product-actions">
                   <q-btn
-                    size="sm" dense no-caps
-                    :color="props.row.status === 'ACTIVE' ? 'grey' : 'positive'"
+                    size="sm"
+                    flat
+                    dense
+                    no-caps
+                    color="primary"
+                    icon="edit"
+                    label="修改"
+                    @click="openEdit(props.row)"
+                  />
+                  <q-btn
+                    size="sm"
+                    flat
+                    dense
+                    no-caps
+                    :color="props.row.status === 'ACTIVE' ? 'grey-7' : 'positive'"
+                    :icon="props.row.status === 'ACTIVE' ? 'block' : 'check_circle'"
                     :label="props.row.status === 'ACTIVE' ? '停用' : '啟用'"
                     @click="toggleStatus(props.row)"
                   />
                 </div>
               </q-td>
+            </template>
+
+            <template #no-data>
+              <div class="product-empty">
+                <q-icon name="inventory_2" size="40px" color="grey-5" />
+                <p>查無符合條件的商品</p>
+                <q-btn
+                  outline
+                  color="primary"
+                  label="新增第一筆商品"
+                  no-caps
+                  icon="add"
+                  @click="openCreate"
+                />
+              </div>
             </template>
           </q-table>
         </q-card-section>
@@ -299,78 +438,312 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
 
     <!-- 新增 / 修改 Dialog -->
     <q-dialog v-model="dialogOpen" persistent>
-      <q-card style="min-width: 520px">
-        <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">{{ isEditing ? '修改商品' : '新增商品' }}</div>
-          <q-space />
-          <q-btn icon="close" flat round dense v-close-popup />
+      <q-card class="product-dialog">
+        <q-card-section class="product-dialog__header">
+          <div>
+            <p class="product-dialog__kicker">{{ isEditing ? 'EDIT PRODUCT' : 'NEW PRODUCT' }}</p>
+            <div class="text-h6">{{ isEditing ? '修改商品' : '新增商品' }}</div>
+            <p class="product-dialog__desc">
+              {{ isEditing ? '更新商品設定後將立即套用至投保申請' : '建立新商品後即可於投保申請中選用' }}
+            </p>
+          </div>
+          <q-btn icon="close" flat round dense v-close-popup aria-label="關閉" />
         </q-card-section>
 
-        <q-card-section>
-          <div class="row q-col-gutter-md">
-            <div class="col-12 col-sm-6">
-              <q-input
-                v-model="form.productCode"
-                label="商品代碼 *"
-                dense outlined
-                :readonly="isEditing"
-                :bg-color="isEditing ? 'grey-2' : undefined"
-              />
-            </div>
-            <div class="col-12 col-sm-6">
-              <q-input v-model="form.productName" label="商品名稱 *" dense outlined />
-            </div>
-            <div class="col-12 col-sm-6">
-              <q-select
-                v-model="form.productType"
-                :options="typeFormOptions"
-                label="商品類型 *"
-                dense outlined emit-value map-options
-              />
-            </div>
-            <div v-if="isEditing" class="col-12 col-sm-6">
-              <q-select
-                v-model="form.status"
-                :options="statusFormOptions"
-                label="狀態 *"
-                dense outlined emit-value map-options
-              />
-            </div>
-            <div class="col-12 col-sm-6">
-              <q-input v-model.number="form.basePremium" label="基本保費 *" dense outlined type="number" />
-            </div>
-            <div class="col-12 col-sm-6">
-              <q-input v-model.number="form.minAmount" label="最低保額 *" dense outlined type="number" />
-            </div>
-            <div class="col-12 col-sm-6">
-              <q-input v-model.number="form.maxAmount" label="最高保額 *" dense outlined type="number" />
-            </div>
-            <div class="col-12 col-sm-6">
-              <q-input v-model.number="form.minAge" label="最低投保年齡 *" dense outlined type="number" />
-            </div>
-            <div class="col-12 col-sm-6">
-              <q-input v-model.number="form.maxAge" label="最高投保年齡 *" dense outlined type="number" />
-            </div>
-            <div class="col-12">
-              <q-input v-model="form.remark" label="備註" dense outlined type="textarea" :rows="2" />
-            </div>
+        <q-separator />
+
+        <q-card-section class="product-dialog__body">
+          <p class="page-form-section__title">基本資料</p>
+          <div class="page-form-grid q-mb-md">
+            <q-input
+              v-model="form.productCode"
+              label="商品代碼 *"
+              dense
+              outlined
+              stack-label
+              :readonly="isEditing"
+              :bg-color="isEditing ? 'grey-2' : undefined"
+              hint="建立後不可修改"
+            />
+            <q-input
+              v-model="form.productName"
+              label="商品名稱 *"
+              dense
+              outlined
+              stack-label
+            />
+            <q-select
+              v-model="form.productType"
+              :options="typeFormOptions"
+              label="商品類型 *"
+              dense
+              outlined
+              emit-value
+              map-options
+            />
+            <q-select
+              v-if="isEditing"
+              v-model="form.status"
+              :options="statusFormOptions"
+              label="上架狀態 *"
+              dense
+              outlined
+              emit-value
+              map-options
+            />
           </div>
 
+          <p class="page-form-section__title">保費與保額</p>
+          <div class="page-form-grid q-mb-md">
+            <q-input
+              v-model.number="form.basePremium"
+              label="基本保費 *"
+              dense
+              outlined
+              stack-label
+              type="number"
+              min="0"
+            />
+            <div class="product-dialog__spacer" aria-hidden="true" />
+            <q-input
+              v-model.number="form.minAmount"
+              label="最低保額 *"
+              dense
+              outlined
+              stack-label
+              type="number"
+              min="0"
+            />
+            <q-input
+              v-model.number="form.maxAmount"
+              label="最高保額 *"
+              dense
+              outlined
+              stack-label
+              type="number"
+              min="0"
+            />
+          </div>
+
+          <p class="page-form-section__title">投保年齡</p>
+          <div class="page-form-grid q-mb-md">
+            <q-input
+              v-model.number="form.minAge"
+              label="最低投保年齡 *"
+              dense
+              outlined
+              stack-label
+              type="number"
+              min="0"
+              suffix="歲"
+            />
+            <q-input
+              v-model.number="form.maxAge"
+              label="最高投保年齡 *"
+              dense
+              outlined
+              stack-label
+              type="number"
+              min="0"
+              suffix="歲"
+            />
+          </div>
+
+          <p class="page-form-section__title">其他</p>
+          <q-input
+            v-model="form.remark"
+            label="備註"
+            dense
+            outlined
+            type="textarea"
+            autogrow
+            :rows="2"
+            hint="選填，將顯示於商品名稱下方"
+          />
+
           <q-banner v-if="dialogError" rounded class="bg-red-1 text-red-8 q-mt-md">
+            <template #avatar>
+              <q-icon name="error_outline" color="red-8" />
+            </template>
             {{ dialogError }}
           </q-banner>
         </q-card-section>
 
-        <q-card-section class="row justify-end q-gutter-sm q-pt-none">
-          <q-btn flat label="取消" v-close-popup />
+        <q-separator />
+
+        <q-card-actions align="right" class="product-dialog__actions">
+          <q-btn flat label="取消" no-caps v-close-popup />
           <q-btn
             color="primary"
-            :label="isEditing ? '儲存' : '新增'"
+            unelevated
+            no-caps
+            :label="isEditing ? '儲存變更' : '建立商品'"
             :loading="dialogLoading"
             @click="submitForm"
           />
-        </q-card-section>
+        </q-card-actions>
       </q-card>
     </q-dialog>
   </section>
 </template>
+
+<style scoped>
+.product-list-page {
+  --product-accent: #38a169;
+}
+
+.product-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.product-list-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.product-list-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.product-list-table :deep(thead tr) {
+  background: #f7fafc;
+}
+
+.product-list-table :deep(.q-table thead th) {
+  font-weight: 700;
+  color: #2d3748;
+  white-space: nowrap;
+}
+
+.product-code {
+  font-family: ui-monospace, 'Cascadia Code', 'Consolas', monospace;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #2d3748;
+  letter-spacing: 0.02em;
+}
+
+.product-name-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.product-name-cell__title {
+  font-weight: 600;
+  color: #1a202c;
+}
+
+.product-name-cell__remark {
+  font-size: 0.78rem;
+  color: #718096;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
+.product-amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.product-amount--muted {
+  font-weight: 500;
+  color: #4a5568;
+}
+
+.product-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.product-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px 16px;
+  color: #718096;
+}
+
+.product-empty p {
+  margin: 0;
+}
+
+.product-dialog {
+  width: min(640px, 92vw);
+  max-width: 92vw;
+}
+
+.product-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.product-dialog__kicker {
+  margin: 0 0 4px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--product-accent);
+}
+
+.product-dialog__desc {
+  margin: 4px 0 0;
+  font-size: 0.875rem;
+  color: #718096;
+}
+
+.product-dialog__body {
+  max-height: min(70vh, 640px);
+  overflow-y: auto;
+}
+
+.product-dialog__actions {
+  padding: 12px 16px;
+}
+
+.product-dialog__spacer {
+  display: none;
+}
+
+@media (min-width: 761px) {
+  .product-dialog__spacer {
+    display: block;
+  }
+}
+
+@media (max-width: 1024px) {
+  .product-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .product-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .product-list-toolbar {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .product-name-cell__remark {
+    max-width: 160px;
+  }
+}
+</style>

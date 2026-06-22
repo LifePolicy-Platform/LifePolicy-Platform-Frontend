@@ -1,40 +1,56 @@
 <template>
-  <div class="q-pa-md bg-grey-1">
-    <div class="row items-center justify-between q-mb-md">
-      <div class="text-h5 text-weight-bold text-primary">理賠管理</div>
-      <q-btn color="primary" icon="add" label="新增理賠案件" @click="openDialog(null)" />
-    </div>
+  <section class="page-with-hero">
+    <PageHero title="理賠管理" subtitle="查詢、新增與修改理賠案件" />
 
-    <q-card class="q-mb-md flat bordered">
-      <q-card-section class="row q-col-gutter-sm items-center">
-        <div class="col-12 col-sm-3">
-          <q-select v-model="filters.status" :options="statusOptions" emit-value map-options label="案件狀態" outlined dense clearable />
-        </div>
-        <div class="col-12 col-sm-3">
-          <q-input v-model="filters.policyNo" label="保單號碼" outlined dense clearable />
-        </div>
-        <div class="col-12 col-sm-3">
-          <q-input
-            ref="applyDateInputRef"
-            v-model="filters.applyDate"
-            type="date"
-            label="申請日期"
-            outlined
-            dense
-            stack-label
-            clearable
-            behavior="menu"
-            @click="openDatePicker"
-          />
-        </div>
-        <div class="col-12 col-sm-3">
-          <q-btn color="secondary" icon="search" label="查詢" class="q-mr-sm" @click="loadData" />
-          <q-btn color="grey-6" label="顯示全部" @click="resetFilters" />
-        </div>
-      </q-card-section>
-    </q-card>
+    <div class="page-body">
+      <q-card flat class="page-card page-card--filter q-mb-md">
+        <q-card-section>
+          <div class="page-card__header q-mb-sm">
+            <div>
+              <p class="page-card__kicker">CLAIM FILTER</p>
+              <div class="page-card__title">查詢條件</div>
+            </div>
+          </div>
+          <div class="row q-col-gutter-sm items-end q-mt-sm">
+            <div class="col-12 col-sm-4">
+              <q-select v-model="filters.status" :options="statusOptions" emit-value map-options label="案件狀態" outlined dense clearable />
+            </div>
+            <div class="col-12 col-sm-4">
+              <q-input v-model="filters.policyNo" label="保單號碼" outlined dense clearable />
+            </div>
+            <div class="col-12 col-sm-4">
+              <q-input
+                ref="applyDateInputRef"
+                v-model="filters.applyDate"
+                type="date"
+                label="申請日期"
+                outlined
+                dense
+                stack-label
+                clearable
+                behavior="menu"
+                @click="openDatePicker"
+              />
+            </div>
+          </div>
+          <div class="q-mt-md row items-center wrap q-gutter-sm">
+            <q-btn color="primary" unelevated icon="search" label="查詢" no-caps :loading="loading" @click="loadData" />
+            <q-btn outline color="primary" label="顯示全部" no-caps icon="refresh" @click="resetFilters" />
+          </div>
+        </q-card-section>
+      </q-card>
 
-    <q-table :rows="rows || []" :columns="columns" row-key="claimNo" :loading="loading" flat bordered class="bg-white">
+      <q-card flat class="page-card page-card--data">
+        <q-card-section>
+          <div class="page-card__header q-mb-md">
+            <div>
+              <p class="page-card__kicker">CLAIM LIST</p>
+              <div class="page-card__title">理賠清單</div>
+            </div>
+            <q-btn color="primary" unelevated icon="add" label="新增理賠案件" no-caps @click="openDialog(null)" />
+          </div>
+
+          <q-table :rows="rows || []" :columns="columns" row-key="claimNo" :loading="loading" flat bordered class="app-table">
       <template v-slot:body-cell-claimStatus="props">
         <q-td :props="props">
           <q-badge :color="getStatusColor(props.value)" text-color="white" class="q-pa-xs text-weight-medium">
@@ -50,7 +66,10 @@
           <!-- <q-btn size="sm" color="negative" flat icon="delete" label="刪除" :disabled="props.row.claimStatus !== 'PENDING'" @click="confirmDelete(props.row.claimNo)" /> -->
         </q-td>
       </template>
-    </q-table>
+          </q-table>
+        </q-card-section>
+      </q-card>
+    </div>
 
     <q-dialog v-model="dialog.show" persistent>
       <q-card style="width: 600px; max-width: 90vw;">
@@ -331,7 +350,7 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
@@ -340,6 +359,7 @@ import { useQuasar } from 'quasar'
 import type { QTableProps } from 'quasar'
 import axios from 'axios'
 import { watch } from 'vue'
+import PageHero from '@/components/layout/PageHero.vue'
 
 // 將原本的 import axios 替換成這些 API 匯入
 import { 

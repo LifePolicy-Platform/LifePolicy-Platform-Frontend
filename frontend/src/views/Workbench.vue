@@ -138,7 +138,7 @@ watch(activeTab, (tab) => {
 })
 
 const workflowSteps: { key: TabKey; icon: string; label: string; desc: string }[] = [
-  { key: 'create', icon: 'add_circle_outline', label: '新增申請', desc: '建立投保資料' },
+  { key: 'create', icon: 'add_circle_outline', label: '新增案件', desc: '建立投保資料' },
   { key: 'query', icon: 'search', label: '查詢案件', desc: '搜尋與檢視' },
   { key: 'edit', icon: 'edit_note', label: '修改案件', desc: '補正退回件' },
   { key: 'review', icon: 'fact_check', label: '審核案件', desc: '業務／主管審核' },
@@ -712,8 +712,8 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
       </div>
       <div class="page-hero__inner workbench-hero__inner">
         <div class="workbench-hero__copy">
-          <p class="workbench-eyebrow">Policy Operations Workbench</p>
           <h2 class="page-hero__title">保單管理</h2>
+          <p class="page-hero__subtitle workbench-hero__subtitle">新增申請、查詢案件、修改退回與審核保單</p>
         </div>
 
         <nav class="workbench-workflow" aria-label="作業流程">
@@ -765,7 +765,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
               <div class="page-card__header">
                 <div>
                   <p class="page-card__kicker">New policy application</p>
-                  <div class="page-card__title">新增投保申請</div>
+                  <div class="page-card__title">新增投保案件</div>
                 </div>
                 <q-btn outline color="primary" label="檢查重複投保" no-caps icon="warning_amber" @click="runDuplicateCheck(createForm, null)" />
               </div>
@@ -835,8 +835,6 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                 <div class="form-grid q-mt-md">
                   <q-input v-model="queryForm.applicationId" label="申請編號" outlined dense />
                   <q-input v-model="queryForm.applicantIdNo" label="投保人身分證" outlined dense />
-                  <q-input v-model="queryForm.insuredIdNo" label="被保人身分證" outlined dense />
-                  <q-select v-model="queryForm.applicationStatus" label="申請狀態" outlined dense :options="statusOptions" emit-value map-options />
                   <q-select
                     v-model="queryForm.productCode"
                     label="商品代碼"
@@ -857,9 +855,11 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                       </q-item>
                     </template>
                   </q-select>
+                  <q-input v-model="queryForm.insuredIdNo" label="被保人身分證" outlined dense />
+                  <q-select v-model="queryForm.applicationStatus" label="申請狀態" outlined dense :options="statusOptions" emit-value map-options />
+                  <q-select v-model="queryForm.sortDirection" label="排序方向" outlined dense :options="sortOptions" emit-value map-options />
                   <q-input v-model="queryForm.submissionStartTime" label="起始時間" outlined dense type="datetime-local" stack-label />
                   <q-input v-model="queryForm.submissionEndTime" label="結束時間" outlined dense type="datetime-local" stack-label />
-                  <q-select v-model="queryForm.sortDirection" label="排序方向" outlined dense :options="sortOptions" emit-value map-options />
                   <q-input v-model.number="queryForm.pageNo" label="頁碼" outlined dense type="number" />
                   <q-input v-model.number="queryForm.pageSize" label="筆數" outlined dense type="number" />
                 </div>
