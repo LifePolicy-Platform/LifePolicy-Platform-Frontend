@@ -20,8 +20,8 @@ onMounted(() => search())
 
 const statusOptions = [
   { label: '全部', value: '' },
-  { label: '待業務審核', value: 'APPLIED' },
-  { label: '已退回',     value: 'RETURNED' },
+  { label: '待業務審核', value: 'SUBMIT' },
+  { label: '已退回',     value: 'RETURN' },
   { label: '待主管審核', value: 'PENDING' },
 ]
 

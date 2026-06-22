@@ -13,7 +13,7 @@ export async function fetchAptRecords(params: AptRecordListRequest) {
     '/api/apt-records',
     { params },
   )
-  return response.data.data
+  return response.data.DATA ?? []
 }
 
 /** 批次更新約訪時間 */
@@ -22,5 +22,5 @@ export async function updateAptRecords(payload: AptBatchUpdateRequest) {
     '/api/customer/updateAppoint',
     payload,
   )
-  return response.data.data
+  return response.data.DATA ?? []
 }

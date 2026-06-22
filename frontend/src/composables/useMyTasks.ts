@@ -3,15 +3,15 @@ import { fetchIncompleteApplications } from '@/api/policyApplication'
 import type { PolicyRecord } from '@/types/policyApplication'
 
 const STATUS_LABEL: Record<string, string> = {
-  APPLIED:  '待業務審核',
-  RETURNED: '已退回',
-  PENDING:  '待主管審核',
+  SUBMIT:  '待業務審核',
+  RETURN:  '已退回',
+  PENDING: '待主管審核',
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  APPLIED:  'orange',
-  RETURNED: 'red',
-  PENDING:  'blue',
+  SUBMIT:  'orange',
+  RETURN:  'red',
+  PENDING: 'blue',
 }
 
 export function useMyTasks() {
