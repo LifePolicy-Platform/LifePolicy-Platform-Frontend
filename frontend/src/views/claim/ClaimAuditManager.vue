@@ -107,6 +107,15 @@
 
           <q-separator class="q-my-lg" />
 
+          <!-- 自動審核判斷面板 -->
+<div class="q-mt-md q-pa-sm rounded-borders" 
+     :class="auditRules.pass ? 'bg-green-1' : 'bg-red-1'">
+  <div class="text-weight-bold" :class="auditRules.pass ? 'text-green-9' : 'text-red-9'">
+    <q-icon :name="auditRules.pass ? 'check_circle' : 'warning'" class="q-mr-xs" />
+    系統自動審核：{{ auditRules.msg }}
+  </div>
+</div>
+
           <div class="bg-indigo-1 q-pa-md rounded-borders">
             <div class="text-subtitle1 text-weight-bold text-indigo q-mb-sm">審核人員簽核決策</div>
             <div class="row q-col-gutter-sm">
@@ -200,7 +209,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useQuasar } from 'quasar'
 import axios from 'axios'
 import type { QTableColumn } from 'quasar'
@@ -247,22 +256,28 @@ async function loadAuditData() {
 
 // 開啟審核大窗並抓取 Audit Log 軌跡
 async function openAuditDialog(row: any) {
-  auditDialog.form = { ...row }
-  // 清空上一次的核決輸入輸入框
+  // 1. 先顯示彈窗 (或者顯示 loading 狀態)
+  auditDialog.show = true
+  
+  try {
+    // 2. 關鍵：重新呼叫後端 API 取得完整資訊 (包含 JOIN 的 effectDate 等欄位)
+    // 假設你有一個 API 可以透過 claimNo 抓取完整資料
+    const res = await axios.get(`/api/admin/claim/${row.claimNo}`)
+    auditDialog.form = res.data.DATA
+    
+    // 3. 獲取審核 Log
+    const logRes = await axios.get(`/api/admin/claim-audit/logs/${row.claimNo}`)
+    historyLogs.value = logRes.data.DATA
+    
+  } catch (err) {
+    console.error('無法讀取案件詳細資料或 Log', err)
+    $q.notify({ type: 'negative', message: '無法讀取案件詳情' })
+  }
+
+  // 初始化核決表單
   auditForm.action = ''
   auditForm.approveAmount = row.claimStatus === 'APPROVED' ? row.approveAmount : row.claimAmount
   auditForm.remark = ''
-  
-  historyLogs.value = []
-  auditDialog.show = true
-
-  // 非同步向後端獲取歷史審核日誌 tb_claim_aprv_log
-  try {
-    const res = await axios.get(`/api/admin/claim-audit/logs/${row.claimNo}`)
-    historyLogs.value = res.data.DATA
-  } catch (err) {
-    console.error('無法讀取歷史 Log 歷程', err)
-  }
 }
 
 // 提交核決：同意、駁回、或撤回
@@ -281,7 +296,7 @@ async function submitDecision(actionType: string) {
     persistent: true
   }).onOk(async () => {
     try {
-      // 🌟 修正：從複雜的 User JSON 物件中解出大寫的 DISPLAY_NAME
+      // 修正：從複雜的 User JSON 物件中解出大寫的 DISPLAY_NAME
       const userJson = localStorage.getItem('User');
       let currentUserName = '審核主管';
       if (userJson) {
@@ -337,7 +352,7 @@ onMounted(() => {
   loadAuditData()
 })
 
-// 🌟 新增：獲取當前登入使用者的 ROLE_CODE 權限
+// 新增：獲取當前登入使用者的 ROLE_CODE 權限
 function getUserRole(): string {
   const userJson = localStorage.getItem('User')
   if (userJson) {
@@ -374,4 +389,32 @@ function viewPdf(path: string | undefined) {
   // 3. 確保開啟的是一個絕對路徑，避開 Vue Router
   window.open(fullUrl, '_blank');
 }
+
+  const auditRules = computed(() => {
+  const form = auditDialog.form;
+  if (!form.policyNo || !form.applyTime) return { pass: true, msg: '資料載入中...' };
+
+  const applyDate = new Date(form.applyTime);
+  const effectDate = new Date(form.effectDate);
+  const expireDate = new Date(form.expireDate);
+  
+  // 1. 效期比對
+  if (applyDate < effectDate || applyDate > expireDate) {
+    return { pass: false, msg: `❌ 事故日期 (${form.applyTime.substring(0,10)}) 不在保單效期內 (${form.effectDate} ~ ${form.expireDate})` };
+  }
+  
+  // 2. 疾病等待期 (90天)
+  // 如果產品類型是 HEALTH，且 applyDate 距離 effectDate < 90 天
+  // 強制轉大寫比較，確保 'health' 或 'HEALTH' 都能偵測到
+  const type = (form.productType || '').toUpperCase();
+  if (form.productType === 'HEALTH') {
+    const diffTime = applyDate.getTime() - effectDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    if (diffDays < 90) {
+      return { pass: false, msg: `❌ 仍在疾病等待期內 (投保後第 ${diffDays} 天，需滿 90 天)` };
+    }
+  }
+
+  return { pass: true, msg: '✅ 保單效期與等待期檢查通過' };
+});
 </script>
