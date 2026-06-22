@@ -145,6 +145,15 @@
             
             <div class="row justify-end q-gutter-sm q-mt-md">
               
+              <!-- 遞呈按鈕：只有當狀態是 SUBMIT 時出現 -->
+  <q-btn 
+    v-if="getUserRole() === 'APPLICANT' && auditDialog.form.claimStatus === 'SUBMIT'"
+    color="indigo-8" 
+    icon="send" 
+    label="送審遞呈 (SUBMIT -> PENDING)" 
+    @click="submitDecision('PENDING')" 
+  />
+  
               <q-btn 
                 v-if="getUserRole() === 'APPLICANT'"
                 color="orange-8" 
@@ -153,12 +162,18 @@
                 @click="submitDecision('RETURN')" 
               />
               
-              <template v-if="['REVIEWER', 'ADMIN'].includes(getUserRole())">
+              <!-- <template v-if="['REVIEWER', 'ADMIN'].includes(getUserRole())">
                 <template v-if="!['APPROVED', 'REJECTED'].includes(auditDialog.form.claimStatus)">
                   <q-btn color="negative" icon="block" label="駁回拒絕 (REJECTED)" @click="submitDecision('REJECTED')" />
                   <q-btn color="positive" icon="check_circle" label="同意核可 (APPROVED)" @click="submitDecision('APPROVED')" />
                 </template>
-              </template>
+              </template> -->
+              <template v-if="['REVIEWER', 'ADMIN'].includes(getUserRole())">
+    <template v-if="!['APPROVED', 'REJECTED'].includes(auditDialog.form.claimStatus)">
+      <q-btn color="negative" icon="block" label="駁回拒絕 (REJECTED)" @click="submitDecision('REJECTED')" />
+      <q-btn color="positive" icon="check_circle" label="同意核可 (APPROVED)" @click="submitDecision('APPROVED')" />
+    </template>
+  </template>
             </div>
           </div>
         </q-card-section>
@@ -285,7 +300,7 @@ async function submitDecision(actionType: string) {
   auditForm.action = actionType
   
   if (actionType === 'APPROVED' && (auditForm.approveAmount === null || auditForm.approveAmount < 0)) {
-    $q.notify({ type: 'warning', message: '同意准予理賠時，必須填寫正確的核決理賠金額！' })
+    $q.notify({ type: 'warning', message: '必須填寫正確的核決理賠金額！' })
     return
   }
 
