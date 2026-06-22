@@ -1,28 +1,103 @@
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { useQuasar } from 'quasar'
 import { useAuthStore } from '@/stores/auth'
-import { useRouter } from 'vue-router'
-import type { ProductListItem } from '@/types/productMgmt'
+import { useRoute, useRouter } from 'vue-router'
+import type { ProductListItem1 } from '@/types/productMgmt'
 import type { PolicyRecord } from '@/types/policyApplication'
+import type { PolicyHistoryItem } from '@/types/policyMgmt'
+import PolicyHistoryTable from '@/components/policy/PolicyHistoryTable.vue'
 import {
   createPolicyApplication,
   queryPolicyApplications,
   updatePolicyApplication,
   reviewPolicyApplication,
 } from '@/api/policyApplication'
+import { fetchPolicyAprvLogs } from '@/api/policyAprvLog'
+import { fetchActiveProducts } from '@/api/product'
+import {
+  APPLICATION_STATUS_LABEL,
+  applicationStatusColor,
+  applicationStatusLabel,
+  BUSINESS_REVIEW_OPTIONS,
+  reviewSuccessMessage,
+  SUPERVISOR_REVIEW_OPTIONS,
+} from '@/constants/applicationStatus'
+
+type ProductOption = { label: string; value: string }
 
 const router = useRouter()
+const route = useRoute()
 const $q = useQuasar()
 const authStore = useAuthStore()
 
 // ---- 商品清單 ----
-// 原本 JSP 是後端塞 ${products}，這裡先用常數。若後端有商品 API，改成 onMounted 時呼叫。
-const products = ref<ProductListItem[]>([
-  { code: 'LIFE001', name: '安心終身壽險', productType: 'life', status: 'active', minInsuredAge: 0, maxInsuredAge: 70, minSumInsured: 100000, maxSumInsured: 5000000, createdAt: '2024-01-01' },
-  { code: 'LIFE002', name: '定期壽險', productType: 'life', status: 'active', minInsuredAge: 18, maxInsuredAge: 65, minSumInsured: 500000, maxSumInsured: 10000000, createdAt: '2024-01-01' },
-  { code: 'HEALTH001', name: '醫療健康險', productType: 'health', status: 'active', minInsuredAge: 0, maxInsuredAge: 75, minSumInsured: 50000, maxSumInsured: 3000000, createdAt: '2024-01-01' }
-])
+const products = ref<ProductListItem1[]>([])
+const productsExpanded = ref(false)
+const PRODUCT_PREVIEW_COUNT = 5
+const createProductOptions = ref<ProductOption[]>([])
+const queryProductOptions = ref<ProductOption[]>([{ label: '全部', value: '' }])
+const editProductOptions = ref<ProductOption[]>([])
+
+function buildProductOptions(includeAll = false): ProductOption[] {
+  const items = products.value.map((p) => ({
+    label: `${p.code} - ${p.name}`,
+    value: p.code,
+  }))
+  return includeAll ? [{ label: '全部', value: '' }, ...items] : items
+}
+
+function filterProductOptions(
+  val: string,
+  update: (callback: () => void) => void,
+  target: 'create' | 'query' | 'edit',
+) {
+  update(() => {
+    const needle = val.trim().toLowerCase()
+    const base = products.value.map((p) => ({
+      label: `${p.code} - ${p.name}`,
+      value: p.code,
+    }))
+    const filtered = !needle
+      ? base
+      : base.filter(
+          (opt) =>
+            opt.label.toLowerCase().includes(needle) ||
+            opt.value.toLowerCase().includes(needle),
+        )
+
+    if (target === 'create') {
+      createProductOptions.value = filtered
+    } else if (target === 'query') {
+      queryProductOptions.value = [{ label: '全部', value: '' }, ...filtered]
+    } else {
+      editProductOptions.value = filtered
+    }
+  })
+}
+
+const visibleProducts = computed(() =>
+  productsExpanded.value ? products.value : products.value.slice(0, PRODUCT_PREVIEW_COUNT),
+)
+
+const hasMoreProducts = computed(() => products.value.length > PRODUCT_PREVIEW_COUNT)
+
+function goToPolicyDetail(policyNo: string) {
+  if (!policyNo?.trim()) return
+  router.push({ name: 'policy-mgmt-detail', params: { policyNo: policyNo.trim() } })
+}
+
+async function loadProducts() {
+  try {
+    products.value = await fetchActiveProducts()
+    createProductOptions.value = buildProductOptions()
+    queryProductOptions.value = buildProductOptions(true)
+    editProductOptions.value = buildProductOptions()
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '載入商品失敗'
+    notifyError(message)
+  }
+}
 
 // ---- q-select 用的選項 ----
 const genderOptions = [
@@ -38,35 +113,57 @@ const relationshipOptions = [
 ]
 const statusOptions = [
   { label: '全部', value: '' },
-  { label: 'PENDING', value: 'PENDING' },
-  { label: 'APPROVED', value: 'APPROVED' },
-  { label: 'REJECTED', value: 'REJECTED' }
-]
-const targetStatusOptions = [
-  { label: 'APPROVED', value: 'APPROVED' },
-  { label: 'REJECTED', value: 'REJECTED' }
+  { label: APPLICATION_STATUS_LABEL.PENDING, value: 'PENDING' },
+  { label: APPLICATION_STATUS_LABEL.APPROVED, value: 'APPROVED' },
+  { label: APPLICATION_STATUS_LABEL.REJECTED, value: 'REJECTED' },
+  { label: APPLICATION_STATUS_LABEL.SUBMIT, value: 'SUBMIT' },
+  { label: APPLICATION_STATUS_LABEL.RETURN, value: 'RETURN' },
 ]
 const sortOptions = [
-  { label: 'DESC', value: 'DESC' },
-  { label: 'ASC', value: 'ASC' }
+  { label: '由新到舊', value: 'DESC' },
+  { label: '由舊到新', value: 'ASC' }
 ]
-const productOptions = computed(() => [
-  { label: '請選擇商品', value: '' },
-  ...products.value.map((p) => ({ label: `${p.code} - ${p.name}`, value: p.code }))
-])
-const productFilterOptions = computed(() => [
-  { label: '全部', value: '' },
-  ...products.value.map((p) => ({ label: `${p.code} - ${p.name}`, value: p.code }))
-])
 
 // ---- 分頁 ----
 type TabKey = 'create' | 'query' | 'edit' | 'review'
+const tabKeys: TabKey[] = ['create', 'query', 'edit', 'review']
 const activeTab = ref<TabKey>('create')
+
+function isTabKey(value: unknown): value is TabKey {
+  return typeof value === 'string' && tabKeys.includes(value as TabKey)
+}
+
+onMounted(() => {
+  loadProducts()
+  if (isTabKey(route.query.tab)) activeTab.value = route.query.tab
+})
+
+watch(activeTab, (tab) => {
+  if (route.query.tab !== tab) {
+    router.replace({ query: { ...route.query, tab } })
+  }
+})
+
+const workflowSteps: { key: TabKey; icon: string; label: string; desc: string }[] = [
+  { key: 'create', icon: 'add_circle_outline', label: '新增申請', desc: '建立投保資料' },
+  { key: 'query', icon: 'search', label: '查詢案件', desc: '搜尋與檢視' },
+  { key: 'edit', icon: 'edit_note', label: '修改案件', desc: '補正退回件' },
+  { key: 'review', icon: 'fact_check', label: '審核案件', desc: '業務／主管審核' },
+]
+
+function goToWorkflowTab(tab: TabKey) {
+  activeTab.value = tab
+  nextTick(() => {
+    document.querySelector('.workbench-tab-card')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  })
+}
 
 const canCreate = computed(() => authStore.isAuthenticated && authStore.roles.includes('APPLICANT'))
 const canQuery = computed(() => authStore.isAuthenticated)
 const canEdit = computed(() => authStore.roles.includes('APPLICANT'))
-const canReview = computed(() => authStore.roles.includes('REVIEWER'))
+const canBusinessReview = computed(() => authStore.roles.includes('APPLICANT'))
+const canSupervisorReview = computed(() => authStore.roles.includes('REVIEWER'))
+const canAccessReviewTab = computed(() => canBusinessReview.value || canSupervisorReview.value)
 const displayName = computed(
   () => authStore.currentUser?.DISPLAY_NAME ?? authStore.currentUser?.USERNAME ?? '',
 )
@@ -117,11 +214,40 @@ const queryForm = reactive({
 
 const reviewForm = reactive({
   applicationId: '',
+  sourceStatus: '' as string,
   targetStatus: 'APPROVED',
   rejectionReason: '',
   docIdentity: false,
   docProposal: false,
   docHealth: false
+})
+
+const reviewTargetOptions = computed(() => {
+  if (reviewForm.sourceStatus === 'SUBMIT') {
+    return [...BUSINESS_REVIEW_OPTIONS]
+  }
+  if (reviewForm.sourceStatus === 'PENDING') {
+    return [...SUPERVISOR_REVIEW_OPTIONS]
+  }
+  return []
+})
+
+const reviewStageTitle = computed(() => {
+  if (reviewForm.sourceStatus === 'SUBMIT') return '業務審核（SUBMIT 關卡）'
+  if (reviewForm.sourceStatus === 'PENDING') return '主管審核（PENDING 關卡）'
+  return '審核作業'
+})
+
+const showDocumentCheck = computed(() => reviewForm.sourceStatus === 'PENDING')
+
+const requiresRejectionReason = computed(() =>
+  reviewForm.targetStatus === 'REJECTED' || reviewForm.targetStatus === 'RETURN',
+)
+
+const canPerformLoadedReview = computed(() => {
+  if (reviewForm.sourceStatus === 'SUBMIT') return canBusinessReview.value
+  if (reviewForm.sourceStatus === 'PENDING') return canSupervisorReview.value
+  return false
 })
 
 const submitting = ref(false)
@@ -135,15 +261,51 @@ const hasQueried = ref(false)
 
 // q-table 欄位定義
 const columns = [
-  { name: 'applicationId', label: '申請編號', field: 'APPLICATION_ID', align: 'left' as const },
+  { name: 'applicationId', label: '保單編號', field: 'APPLICATION_ID', align: 'left' as const },
   { name: 'applicant', label: '投保人', field: 'APPLICANT_NAME', align: 'left' as const },
-  { name: 'insured', label: '被保險人', field: 'INSURED_NAME', align: 'left' as const },
+  { name: 'insured', label: '被保人', field: 'INSURED_NAME', align: 'left' as const },
   { name: 'product', label: '商品', field: 'PRODUCT_CODE', align: 'left' as const },
   { name: 'status', label: '狀態', field: 'APPLICATION_STATUS', align: 'left' as const },
   { name: 'risk', label: '風險', field: 'RISK_LEVEL', align: 'left' as const },
   { name: 'ratio', label: '保費比例', field: 'PREMIUM_RATIO', align: 'left' as const },
+  { name: 'history', label: '歷程', field: 'history', align: 'left' as const },
   { name: 'actions', label: '操作', field: 'actions', align: 'left' as const }
 ]
+
+const historyDialogOpen = ref(false)
+const historyLoading = ref(false)
+const historyPolicyNo = ref('')
+const historyRows = ref<PolicyHistoryItem[]>([])
+
+function formatAprvLogTime(value?: string | null): string {
+  if (!value) return '—'
+  return value.replace('T', ' ').slice(0, 19)
+}
+
+async function openPolicyHistory(record: PolicyRecord) {
+  const policyNo = record.APPLICATION_ID
+  historyPolicyNo.value = policyNo
+  historyDialogOpen.value = true
+  historyLoading.value = true
+  historyRows.value = []
+  try {
+    const logs = await fetchPolicyAprvLogs(policyNo)
+    historyRows.value = logs.map((log) => ({
+      id: log.POLICY_LOG_NO,
+      time: formatAprvLogTime(log.APRV_TIME),
+      status: applicationStatusLabel(log.APRV_STATUS),
+      statusCode: log.APRV_STATUS,
+      handler: log.DISPLAY_NAME || '—',
+      remark: log.APRV_REMARK?.trim() || '—',
+    }))
+  } catch (error: unknown) {
+    const err = error as { response?: { data?: { MESSAGE?: string } } }
+    notifyError(err.response?.data?.MESSAGE || '查詢審核歷程失敗')
+    historyDialogOpen.value = false
+  } finally {
+    historyLoading.value = false
+  }
+}
 
 // ---- 即時提示 ----
 const hintForm = computed(() => (activeTab.value === 'edit' ? editForm : createForm))
@@ -169,9 +331,12 @@ const riskLevelHint = computed(() => {
 
 const duplicateWarning = ref('尚未檢查')
 
-const documentHint = computed(() =>
-  areDocumentsConfirmed() ? '文件檢核完成，可進入審核' : '尚有文件未確認，系統會拒絕送審'
-)
+const documentHint = computed(() => {
+  if (!canSupervisorReview.value) {
+    return areDocumentsConfirmed() ? '文件檢核完成' : '主管審核時需完成文件檢核'
+  }
+  return areDocumentsConfirmed() ? '文件檢核完成，可進入主管審核' : '主管審核前，請先完成三項文件勾選'
+})
 
 // ---- 工具函式 ----
 function calculateAge(dateString: string): number {
@@ -215,13 +380,13 @@ function validateApplication(form: ReturnType<typeof blankApplication>): string[
   const phonePattern = /^09\d{8}$/
 
   if (!idPattern.test(form.applicantIdNo)) errors.push('投保人身分證格式需為 1 個英文字母加 9 碼數字')
-  if (!idPattern.test(form.insuredIdNo)) errors.push('被保險人身分證格式需為 1 個英文字母加 9 碼數字')
+  if (!idPattern.test(form.insuredIdNo)) errors.push('被保人身分證格式需為 1 個英文字母加 9 碼數字')
   if (form.applicantName.trim().length < 2) errors.push('投保人姓名至少需 2 個字')
-  if (form.insuredName.trim().length < 2) errors.push('被保險人姓名至少需 2 個字')
+  if (form.insuredName.trim().length < 2) errors.push('被保人姓名至少需 2 個字')
 
   const today = new Date()
   if (form.applicantBirthdate && new Date(form.applicantBirthdate) > today) errors.push('投保人生日不可晚於今天')
-  if (form.insuredBirthdate && new Date(form.insuredBirthdate) > today) errors.push('被保險人生日不可晚於今天')
+  if (form.insuredBirthdate && new Date(form.insuredBirthdate) > today) errors.push('被保人生日不可晚於今天')
 
   if (!form.productCode) errors.push('請選擇商品代碼')
   if (!phonePattern.test(form.contactPhone)) errors.push('聯絡電話需為 09 開頭的 10 碼手機號碼')
@@ -236,6 +401,10 @@ function validateApplication(form: ReturnType<typeof blankApplication>): string[
 }
 
 function buildPayload(form: ReturnType<typeof blankApplication>) {
+  const sumInsured = Number(form.sumInsured || 0)
+  const annualPremium = Number(form.annualPremium || 0)
+  const premiumRatio = sumInsured > 0 ? annualPremium / sumInsured : 0
+
   return {
     APPLICANT_ID_NO: form.applicantIdNo.trim(),
     APPLICANT_NAME: form.applicantName.trim(),
@@ -247,9 +416,11 @@ function buildPayload(form: ReturnType<typeof blankApplication>) {
     INSURED_GENDER: form.insuredGender,
     INSURED_BIRTHDATE: form.insuredBirthdate,
     PRODUCT_CODE: form.productCode,
-    SUM_INSURED: Number(form.sumInsured),
-    ANNUAL_PREMIUM: Number(form.annualPremium),
-    CONTACT_PHONE: form.contactPhone.trim()
+    SUM_INSURED: sumInsured,
+    ANNUAL_PREMIUM: annualPremium,
+    CONTACT_PHONE: form.contactPhone.trim(),
+    RISK_LEVEL: evaluateRiskLevel(form.insuredBirthdate, form.relationshipToInsured, sumInsured, premiumRatio),
+    CREATED_BY: authStore.currentUser?.USERNAME ?? ''
   }
 }
 
@@ -285,9 +456,11 @@ function hasQueryCriteria(): boolean {
   )
 }
 
-async function handleQuery() {
+async function handleQuery(options?: { silent?: boolean }) {
   if (!hasQueryCriteria()) {
-    notifyError('查詢至少要填一個條件，或指定一段送件時間')
+    if (!options?.silent) {
+      notifyError('查詢至少要填一個條件，或指定一段送件時間')
+    }
     return
   }
   if (
@@ -315,7 +488,9 @@ async function handleQuery() {
     queryResults.value = result.RECORDS || []
     queryMeta.value = `第 ${result.PAGE_NO} 頁 / 共 ${result.TOTAL_PAGES} 頁，總筆數 ${result.TOTAL_COUNT}`
     hasQueried.value = true
-    notifySuccess(`查詢完成，共 ${result.TOTAL_COUNT} 筆`)
+    if (!options?.silent) {
+      notifySuccess(`查詢完成，共 ${result.TOTAL_COUNT} 筆`)
+    }
   } catch (error: any) {
     notifyError(error.response?.data?.MESSAGE || '查詢失敗')
   } finally {
@@ -365,8 +540,19 @@ function loadRecordToEdit(record: PolicyRecord) {
 }
 
 function loadRecordToReview(record: PolicyRecord) {
+  if (!canReviewRow(record)) {
+    notifyError('您沒有權限審核此狀態的案件')
+    return
+  }
   reviewForm.applicationId = record.APPLICATION_ID
-  reviewForm.targetStatus = record.APPLICATION_STATUS === 'REJECTED' ? 'REJECTED' : 'APPROVED'
+  reviewForm.sourceStatus = record.APPLICATION_STATUS || ''
+  if (record.APPLICATION_STATUS === 'SUBMIT') {
+    reviewForm.targetStatus = 'PENDING'
+  } else if (record.APPLICATION_STATUS === 'PENDING') {
+    reviewForm.targetStatus = 'APPROVED'
+  } else {
+    reviewForm.targetStatus = 'APPROVED'
+  }
   reviewForm.rejectionReason = record.REJECTION_REASON || ''
   reviewForm.docIdentity = false
   reviewForm.docProposal = false
@@ -377,10 +563,13 @@ function loadRecordToReview(record: PolicyRecord) {
 }
 
 function canEditRow(record: PolicyRecord): boolean {
-  return canEdit.value && record.APPLICATION_STATUS === 'PENDING'
+  return canEdit.value && record.APPLICATION_STATUS === 'RETURN'
 }
 function canReviewRow(record: PolicyRecord): boolean {
-  return canReview.value && record.APPLICATION_STATUS === 'PENDING'
+  const status = record.APPLICATION_STATUS
+  if (status === 'SUBMIT') return canBusinessReview.value
+  if (status === 'PENDING') return canSupervisorReview.value
+  return false
 }
 
 // ---- 修改 ----
@@ -397,7 +586,7 @@ async function handleEdit() {
   submitting.value = true
   try {
     const result = await updatePolicyApplication(editForm.applicationId, buildPayload(editForm))
-    notifySuccess(`修改成功，風險等級 ${result.RISK_LEVEL}`)
+    notifySuccess(`修改成功，已重新送審（SUBMIT），風險等級 ${result.RISK_LEVEL}`)
   } catch (error: any) {
     notifyError(error.response?.data?.MESSAGE || '修改失敗')
   } finally {
@@ -406,17 +595,32 @@ async function handleEdit() {
 }
 
 // ---- 審核 ----
+function resetReviewForm() {
+  reviewForm.applicationId = ''
+  reviewForm.sourceStatus = ''
+  reviewForm.targetStatus = 'APPROVED'
+  reviewForm.rejectionReason = ''
+  reviewForm.docIdentity = false
+  reviewForm.docProposal = false
+  reviewForm.docHealth = false
+  reviewLoaded.value = false
+}
+
 async function handleReview() {
   if (!reviewLoaded.value) {
     notifyError('請先從查詢結果載入要審核的案件')
     return
   }
-  if (reviewForm.targetStatus === 'REJECTED' && !reviewForm.rejectionReason.trim()) {
-    notifyError('選擇 REJECTED 時必須填寫拒絕原因')
+  if (!canPerformLoadedReview.value) {
+    notifyError('您沒有權限審核此狀態的案件')
     return
   }
-  if (!areDocumentsConfirmed()) {
-    notifyError('送出審核前，請先完成三項文件勾選')
+  if (requiresRejectionReason.value && !reviewForm.rejectionReason.trim()) {
+    notifyError(reviewForm.targetStatus === 'RETURN' ? '業務駁回時必須填寫原因' : '主管拒絕時必須填寫原因')
+    return
+  }
+  if (showDocumentCheck.value && !areDocumentsConfirmed()) {
+    notifyError('主管審核前，請先完成三項文件勾選')
     return
   }
   submitting.value = true
@@ -425,9 +629,18 @@ async function handleReview() {
       APPLICATION_ID: reviewForm.applicationId.trim(),
       TARGET_STATUS: reviewForm.targetStatus,
       REJECTION_REASON: reviewForm.rejectionReason.trim() || null,
-      DOCUMENTS_CONFIRMED: areDocumentsConfirmed()
+      DOCUMENTS_CONFIRMED: showDocumentCheck.value ? areDocumentsConfirmed() : true,
+      REVIEWED_BY: authStore.currentUser?.USERNAME ?? '',
     })
-    notifySuccess(`審核完成，最新狀態 ${result.APPLICATION_STATUS}`)
+    const status = result.CURRENT_STATUS ?? reviewForm.targetStatus
+    const successMsg = reviewSuccessMessage(status)
+    resetReviewForm()
+    activeTab.value = 'query'
+    await nextTick()
+    if (hasQueried.value) {
+      await handleQuery({ silent: true })
+    }
+    notifySuccess(successMsg)
   } catch (error: any) {
     notifyError(error.response?.data?.MESSAGE || '審核失敗')
   } finally {
@@ -438,7 +651,7 @@ async function handleReview() {
 // ---- 重複投保檢查 ----
 async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, currentApplicationId: string | null) {
   if (!form.applicantIdNo || !form.insuredIdNo || !form.productCode) {
-    duplicateWarning.value = '請先填妥投保人、被保險人與商品代碼後再檢查'
+    duplicateWarning.value = '請先填妥投保人、被保人與商品代碼後再檢查'
     return
   }
   try {
@@ -446,18 +659,18 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
       APPLICANT_ID_NO: form.applicantIdNo.trim(),
       INSURED_ID_NO: form.insuredIdNo.trim(),
       PRODUCT_CODE: form.productCode,
-      APPLICATION_STATUS: 'PENDING',
       PAGE_NO: 1,
-      PAGE_SIZE: 10,
+      PAGE_SIZE: 20,
       SORT_DIRECTION: 'DESC'
     })
-    const records = result.RECORDS || []
+    const activeStatuses = new Set(['SUBMIT', 'PENDING', 'RETURN'])
+    const records = (result.RECORDS || []).filter((item) => activeStatuses.has(item.APPLICATION_STATUS || ''))
     const duplicates = currentApplicationId
       ? records.filter((item) => item.APPLICATION_ID !== currentApplicationId)
       : records
     duplicateWarning.value = duplicates.length
-      ? `偵測到 ${duplicates.length} 筆相似 PENDING 申請，送出前請再確認`
-      : '未發現相同投保人/被保險人/商品的 PENDING 申請'
+      ? `偵測到 ${duplicates.length} 筆進行中申請（送件/待審/退回），送出前請再確認`
+      : '未發現重複投保風險，可進行投保申請'
   } catch (error: any) {
     duplicateWarning.value = error.response?.data?.MESSAGE || '檢查失敗'
   }
@@ -465,65 +678,71 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
 </script>
 
 <template>
-  <div class="page-shell">
-    <!-- Header -->
-    <q-card flat class="hero-panel">
-      <div class="hero-main">
-        <p class="eyebrow">Financial Life Insurance</p>
-        <h1>投保申請作業工作台</h1>
-        <p class="hero-copy">
-          同一頁完成新增、查詢、修改、審核，並即時呈現保費比例、風險等級、缺件提醒與重複投保預警。
-        </p>
+  <section class="page-with-hero workbench-page">
+    <header class="page-hero workbench-hero">
+      <div class="page-hero__blobs" aria-hidden="true">
+        <span class="page-hero__blob page-hero__blob--1" />
+        <span class="page-hero__blob page-hero__blob--2" />
+        <span class="page-hero__blob page-hero__blob--3" />
       </div>
-      <q-card flat class="hero-side-card">
-        <div class="text-h6 q-mb-sm">目前身分</div>
-        <div v-if="authStore.isAuthenticated">
-          {{ displayName }}
-          <q-chip v-for="role in authStore.roles" :key="role" dense size="sm" color="amber-7" text-color="white">
-            {{ role }}
-          </q-chip>
-          <br />
-          <q-btn
-            flat
-            no-caps
-            label="返回工作台"
-            to="/dashboard"
-            class="back-link-btn"
-          />
+      <div class="page-hero__inner workbench-hero__inner">
+        <div class="workbench-hero__copy">
+          <p class="workbench-eyebrow">Policy Operations Workbench</p>
+          <h2 class="page-hero__title">保單管理</h2>
         </div>
-        <div v-else>尚未登入，請先登入後再操作。</div>
-      </q-card>
-    </q-card>
 
-    <!-- 分頁 -->
-    <q-card flat class="tab-card">
-      <q-tabs
-        v-model="activeTab"
-        align="left"
-        active-color="teal-9"
-        indicator-color="teal-9"
-        class="text-grey-7"
-        no-caps
-      >
-        <q-tab name="create" label="新增申請" />
-        <q-tab name="query" label="查詢案件" />
-        <q-tab name="edit" label="修改案件" />
-        <q-tab name="review" label="審核案件" />
-      </q-tabs>
-    </q-card>
+        <nav class="workbench-workflow" aria-label="作業流程">
+          <button
+            v-for="step in workflowSteps"
+            :key="step.key"
+            type="button"
+            class="workbench-workflow__step"
+            :class="{ 'workbench-workflow__step--active': activeTab === step.key }"
+            @click="goToWorkflowTab(step.key)"
+          >
+            <span class="workbench-workflow__icon" aria-hidden="true">
+              <q-icon :name="step.icon" size="20px" />
+            </span>
+            <span class="workbench-workflow__text">
+              <span class="workbench-workflow__label">{{ step.label }}</span>
+              <span class="workbench-workflow__desc">{{ step.desc }}</span>
+            </span>
+          </button>
+        </nav>
+      </div>
+    </header>
 
-    <div class="workspace-grid">
-      <div class="main-column">
-        <q-tab-panels v-model="activeTab" animated class="transparent-panels">
+    <div class="page-body workbench-body">
+      <!-- <q-card flat class="page-tab-card workbench-tab-card">
+        <q-tabs
+          v-model="activeTab"
+          align="left"
+          dense
+          no-caps
+          active-color="primary"
+          indicator-color="primary"
+          class="workbench-tabs text-grey-7"
+        >
+          <q-tab name="create" icon="add_circle_outline" label="新增申請" />
+          <q-tab name="query" icon="search" label="查詢案件" />
+          <q-tab name="edit" icon="edit_note" label="修改案件" />
+          <q-tab name="review" icon="fact_check" label="審核案件" />
+        </q-tabs>
+        <q-separator />
+      </q-card> -->
+      <div class="workbench-grid">
+        <div class="workbench-main">
+          <q-tab-panels v-model="activeTab" animated class="workbench-panels bg-transparent">
           <!-- 新增 -->
           <q-tab-panel name="create" class="q-pa-none">
-            <q-card flat class="content-card">
-              <div class="panel-header">
+            <q-card flat class="page-card workbench-panel">
+              <q-card-section>
+              <div class="page-card__header">
                 <div>
-                  <p class="panel-kicker">POL_APP_CMD</p>
-                  <div class="text-h6">新增投保申請</div>
+                  <p class="page-card__kicker">POL_APP_CMD</p>
+                  <div class="page-card__title">新增投保申請</div>
                 </div>
-                <q-btn outline color="brown-6" label="檢查重複投保" no-caps @click="runDuplicateCheck(createForm, null)" />
+                <q-btn outline color="primary" label="檢查重複投保" no-caps icon="warning_amber" @click="runDuplicateCheck(createForm, null)" />
               </div>
 
               <q-banner v-if="!canCreate" rounded class="bg-amber-1 text-brown-8 q-mt-md">
@@ -537,29 +756,50 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   <q-select v-model="createForm.applicantGender" label="投保人性別" outlined dense :options="genderOptions" emit-value map-options />
                   <q-input v-model="createForm.applicantBirthdate" label="投保人生日" outlined dense type="date" stack-label />
                   <q-select v-model="createForm.relationshipToInsured" label="關係" outlined dense :options="relationshipOptions" emit-value map-options />
-                  <q-input v-model="createForm.insuredIdNo" label="被保險人身分證" outlined dense maxlength="10" />
-                  <q-input v-model="createForm.insuredName" label="被保險人姓名" outlined dense maxlength="50" />
-                  <q-select v-model="createForm.insuredGender" label="被保險人性別" outlined dense :options="genderOptions" emit-value map-options />
-                  <q-input v-model="createForm.insuredBirthdate" label="被保險人生日" outlined dense type="date" stack-label />
-                  <q-select v-model="createForm.productCode" label="商品代碼" outlined dense :options="productOptions" emit-value map-options />
+                  <q-input v-model="createForm.insuredIdNo" label="被保人身分證" outlined dense maxlength="10" />
+                  <q-input v-model="createForm.insuredName" label="被保人姓名" outlined dense maxlength="50" />
+                  <q-select v-model="createForm.insuredGender" label="被保人性別" outlined dense :options="genderOptions" emit-value map-options />
+                  <q-input v-model="createForm.insuredBirthdate" label="被保人生日" outlined dense type="date" stack-label />
+                  <q-select
+                    v-model="createForm.productCode"
+                    label="商品代碼"
+                    outlined
+                    dense
+                    use-input
+                    fill-input
+                    hide-selected
+                    input-debounce="200"
+                    :options="createProductOptions"
+                    emit-value
+                    map-options
+                    @filter="(val, update) => filterProductOptions(val, update, 'create')"
+                  >
+                    <template #no-option>
+                      <q-item>
+                        <q-item-section class="text-grey">查無符合的商品</q-item-section>
+                      </q-item>
+                    </template>
+                  </q-select>
                   <q-input v-model="createForm.sumInsured" label="保額" outlined dense type="number" />
                   <q-input v-model="createForm.annualPremium" label="年繳保費" outlined dense type="number" />
                   <q-input v-model="createForm.contactPhone" label="聯絡電話" outlined dense maxlength="10" />
                 </div>
                 <div class="q-mt-md">
-                  <q-btn color="teal-9" unelevated rounded label="送出新增" no-caps :loading="submitting" @click="handleCreate" />
+                  <q-btn color="primary" unelevated label="送出新增" no-caps icon="send" :loading="submitting" @click="handleCreate" />
                 </div>
               </template>
+              </q-card-section>
             </q-card>
           </q-tab-panel>
 
           <!-- 查詢 -->
           <q-tab-panel name="query" class="q-pa-none">
-            <q-card flat class="content-card">
-              <div class="panel-header">
+            <q-card flat class="page-card workbench-panel">
+              <q-card-section>
+              <div class="page-card__header">
                 <div>
-                  <p class="panel-kicker">POL_APP_QRY</p>
-                  <div class="text-h6">查詢投保申請</div>
+                  <p class="page-card__kicker">POL_APP_QRY</p>
+                  <div class="page-card__title">查詢投保申請</div>
                 </div>
               </div>
 
@@ -571,24 +811,48 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                 <div class="form-grid q-mt-md">
                   <q-input v-model="queryForm.applicationId" label="申請編號" outlined dense />
                   <q-input v-model="queryForm.applicantIdNo" label="投保人身分證" outlined dense />
-                  <q-input v-model="queryForm.insuredIdNo" label="被保險人身分證" outlined dense />
+                  <q-input v-model="queryForm.insuredIdNo" label="被保人身分證" outlined dense />
                   <q-select v-model="queryForm.applicationStatus" label="申請狀態" outlined dense :options="statusOptions" emit-value map-options />
-                  <q-select v-model="queryForm.productCode" label="商品代碼" outlined dense :options="productFilterOptions" emit-value map-options />
+                  <q-select
+                    v-model="queryForm.productCode"
+                    label="商品代碼"
+                    outlined
+                    dense
+                    use-input
+                    fill-input
+                    hide-selected
+                    input-debounce="200"
+                    :options="queryProductOptions"
+                    emit-value
+                    map-options
+                    @filter="(val, update) => filterProductOptions(val, update, 'query')"
+                  >
+                    <template #no-option>
+                      <q-item>
+                        <q-item-section class="text-grey">查無符合的商品</q-item-section>
+                      </q-item>
+                    </template>
+                  </q-select>
                   <q-input v-model="queryForm.submissionStartTime" label="起始時間" outlined dense type="datetime-local" stack-label />
                   <q-input v-model="queryForm.submissionEndTime" label="結束時間" outlined dense type="datetime-local" stack-label />
                   <q-select v-model="queryForm.sortDirection" label="排序方向" outlined dense :options="sortOptions" emit-value map-options />
                   <q-input v-model.number="queryForm.pageNo" label="頁碼" outlined dense type="number" />
                   <q-input v-model.number="queryForm.pageSize" label="筆數" outlined dense type="number" />
                 </div>
-                <div class="q-mt-md q-gutter-sm">
-                  <q-btn color="teal-9" unelevated rounded label="執行查詢" no-caps :loading="submitting" @click="handleQuery" />
-                  <q-btn outline color="brown-6" rounded label="清空條件" no-caps @click="resetQuery" />
+                <div class="q-mt-md row items-center wrap q-gutter-sm">
+                  <q-btn color="primary" unelevated label="執行查詢" no-caps icon="search" :loading="submitting" @click="handleQuery" />
+                  <q-btn outline color="primary" label="清空條件" no-caps icon="refresh" @click="resetQuery" />
+                  <span class="workbench-query-hint text-caption text-grey-7">
+                    <q-icon name="info_outline" size="16px" class="q-mr-xs" />
+                    點擊保單編號可查看詳細資料 / 安排約訪
+                  </span>
                 </div>
 
                 <q-table
-                  class="q-mt-md"
+                  class="q-mt-md workbench-table app-table"
                   flat
                   bordered
+                  dense
                   :rows="queryResults"
                   :columns="columns"
                   row-key="APPLICATION_ID"
@@ -596,19 +860,43 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   :rows-per-page-options="[0]"
                   :no-data-label="hasQueried ? '查無資料' : '尚未查詢資料'"
                 >
+                  <template #body-cell-applicationId="props">
+                    <q-td :props="props">
+                      <button
+                        type="button"
+                        class="workbench-policy-link"
+                        @click="goToPolicyDetail(props.row.APPLICATION_ID)"
+                      >
+                        {{ props.row.APPLICATION_ID }}
+                      </button>
+                    </q-td>
+                  </template>
                   <template #body-cell-applicant="props">
                     <q-td :props="props">
-                      {{ props.row.APPLICANT_NAME }}<br /><small class="text-grey-6">{{ props.row.APPLICANT_ID_NO }}</small>
+                      {{ props.row.APPLICANT_NAME || '—' }}
                     </q-td>
                   </template>
                   <template #body-cell-insured="props">
                     <q-td :props="props">
-                      {{ props.row.INSURED_NAME }}<br /><small class="text-grey-6">{{ props.row.INSURED_ID_NO }}</small>
+                      {{ props.row.INSURED_NAME || '—' }}
                     </q-td>
                   </template>
                   <template #body-cell-product="props">
                     <q-td :props="props">
-                      {{ props.row.PRODUCT_CODE }}<br /><small class="text-grey-6">{{ props.row.PRODUCT_NAME }}</small>
+                      <div>{{ props.row.PRODUCT_NAME || '—' }}</div>
+                      <small class="text-grey-6">{{ props.row.PRODUCT_CODE }}</small>
+                    </q-td>
+                  </template>
+                  <template #body-cell-status="props">
+                    <q-td :props="props">
+                      <q-chip
+                        dense
+                        size="sm"
+                        :color="applicationStatusColor(props.row.APPLICATION_STATUS)"
+                        text-color="white"
+                      >
+                        {{ applicationStatusLabel(props.row.APPLICATION_STATUS) }}
+                      </q-chip>
                     </q-td>
                   </template>
                   <template #body-cell-risk="props">
@@ -621,11 +909,25 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   <template #body-cell-ratio="props">
                     <q-td :props="props">{{ formatRatio(props.row.PREMIUM_RATIO) }}</q-td>
                   </template>
+                  <template #body-cell-history="props">
+                    <q-td :props="props">
+                      <q-btn
+                        size="sm"
+                        dense
+                        flat
+                        color="primary"
+                        label="歷程"
+                        no-caps
+                        icon="history"
+                        @click="openPolicyHistory(props.row)"
+                      />
+                    </q-td>
+                  </template>
                   <template #body-cell-actions="props">
                     <q-td :props="props">
                       <div class="q-gutter-xs">
-                        <q-btn v-if="canEditRow(props.row)" size="sm" dense color="teal-7" label="帶入修改" no-caps @click="loadRecordToEdit(props.row)" />
-                        <q-btn v-if="canReviewRow(props.row)" size="sm" dense color="indigo-7" label="帶入審核" no-caps @click="loadRecordToReview(props.row)" />
+                        <q-btn v-if="canEditRow(props.row)" size="sm" dense color="primary" label="帶入修改" no-caps @click="loadRecordToEdit(props.row)" />
+                        <q-btn v-if="canReviewRow(props.row)" size="sm" dense outline color="primary" label="帶入審核" no-caps @click="loadRecordToReview(props.row)" />
                         <span v-if="!canEditRow(props.row) && !canReviewRow(props.row)" class="text-grey-6">無可用操作</span>
                       </div>
                     </q-td>
@@ -633,18 +935,19 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                 </q-table>
                 <div class="text-caption text-grey-6 q-mt-sm">{{ queryMeta }}</div>
               </template>
+              </q-card-section>
             </q-card>
           </q-tab-panel>
 
           <!-- 修改 -->
           <q-tab-panel name="edit" class="q-pa-none">
-            <q-card flat class="content-card">
-              <div class="panel-header">
+            <q-card flat class="page-card workbench-panel">
+              <q-card-section>
+              <div class="page-card__header">
                 <div>
-                  <p class="panel-kicker">POL_APP_UPD</p>
-                  <div class="text-h6">修改 PENDING 案件</div>
+                  <p class="page-card__kicker">POL_APP_UPD</p>
+                  <div class="page-card__title">修改 RETURN 退回案件</div>
                 </div>
-                <q-btn outline color="brown-6" label="檢查重複投保" no-caps @click="runDuplicateCheck(editForm, editForm.applicationId)" />
               </div>
 
               <q-banner v-if="!canEdit" rounded class="bg-amber-1 text-brown-8 q-mt-md">此功能僅開放 APPLICANT 使用。</q-banner>
@@ -659,184 +962,348 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   <q-select v-model="editForm.applicantGender" label="投保人性別" outlined dense :options="genderOptions" emit-value map-options />
                   <q-input v-model="editForm.applicantBirthdate" label="投保人生日" outlined dense type="date" stack-label />
                   <q-select v-model="editForm.relationshipToInsured" label="關係" outlined dense :options="relationshipOptions" emit-value map-options />
-                  <q-input v-model="editForm.insuredIdNo" label="被保險人身分證" outlined dense maxlength="10" />
-                  <q-input v-model="editForm.insuredName" label="被保險人姓名" outlined dense maxlength="50" />
-                  <q-select v-model="editForm.insuredGender" label="被保險人性別" outlined dense :options="genderOptions" emit-value map-options />
-                  <q-input v-model="editForm.insuredBirthdate" label="被保險人生日" outlined dense type="date" stack-label />
-                  <q-select v-model="editForm.productCode" label="商品代碼" outlined dense :options="productOptions" emit-value map-options />
+                  <q-input v-model="editForm.insuredIdNo" label="被保人身分證" outlined dense maxlength="10" />
+                  <q-input v-model="editForm.insuredName" label="被保人姓名" outlined dense maxlength="50" />
+                  <q-select v-model="editForm.insuredGender" label="被保人性別" outlined dense :options="genderOptions" emit-value map-options />
+                  <q-input v-model="editForm.insuredBirthdate" label="被保人生日" outlined dense type="date" stack-label />
+                  <q-select
+                    v-model="editForm.productCode"
+                    label="商品代碼"
+                    outlined
+                    dense
+                    use-input
+                    fill-input
+                    hide-selected
+                    input-debounce="200"
+                    :options="editProductOptions"
+                    emit-value
+                    map-options
+                    @filter="(val, update) => filterProductOptions(val, update, 'edit')"
+                  >
+                    <template #no-option>
+                      <q-item>
+                        <q-item-section class="text-grey">查無符合的商品</q-item-section>
+                      </q-item>
+                    </template>
+                  </q-select>
                   <q-input v-model="editForm.sumInsured" label="保額" outlined dense type="number" />
                   <q-input v-model="editForm.annualPremium" label="年繳保費" outlined dense type="number" />
                   <q-input v-model="editForm.contactPhone" label="聯絡電話" outlined dense maxlength="10" />
                 </div>
                 <div class="q-mt-md">
-                  <q-btn color="teal-9" unelevated rounded label="送出修改" no-caps :loading="submitting" @click="handleEdit" />
+                  <q-btn color="primary" unelevated label="送出修改" no-caps icon="save" :loading="submitting" @click="handleEdit" />
                 </div>
               </template>
+              </q-card-section>
             </q-card>
           </q-tab-panel>
 
           <!-- 審核 -->
           <q-tab-panel name="review" class="q-pa-none">
-            <q-card flat class="content-card">
-              <div class="panel-header">
+            <q-card flat class="page-card workbench-panel">
+              <q-card-section>
+              <div class="page-card__header">
                 <div>
-                  <p class="panel-kicker">POL_APP_APRV</p>
-                  <div class="text-h6">審核作業</div>
+                  <p class="page-card__kicker">POL_APP_APRV</p>
+                  <div class="page-card__title">{{ reviewStageTitle }}</div>
                 </div>
               </div>
 
-              <q-banner v-if="!canReview" rounded class="bg-amber-1 text-brown-8 q-mt-md">此功能僅開放 REVIEWER 使用。</q-banner>
-              <q-banner v-else-if="!reviewLoaded" rounded class="bg-amber-1 text-brown-8 q-mt-md">請先從查詢結果帶入待審案件。</q-banner>
+              <q-banner v-if="!canAccessReviewTab" rounded class="bg-amber-1 text-brown-8 q-mt-md">
+                此功能僅開放 APPLICANT（業務審核）或 REVIEWER（主管審核）使用。
+              </q-banner>
+              <q-banner v-else-if="!reviewLoaded" rounded class="bg-amber-1 text-brown-8 q-mt-md">
+                請先從查詢結果帶入待審案件：業務審核 SUBMIT、主管審核 PENDING。
+              </q-banner>
+              <q-banner v-else-if="!canPerformLoadedReview" rounded class="bg-amber-1 text-brown-8 q-mt-md">
+                您沒有權限審核此狀態的案件，請重新從查詢結果帶入。
+              </q-banner>
 
               <template v-else>
+                <q-banner rounded class="bg-blue-1 text-blue-9 q-mt-md">
+                  目前狀態：{{ applicationStatusLabel(reviewForm.sourceStatus) }}
+                </q-banner>
                 <div class="form-grid q-mt-md">
-                  <q-input v-model="reviewForm.applicationId" label="申請編號" outlined dense readonly />
+                  <q-input v-model="reviewForm.applicationId" label="保單編號" outlined dense readonly />
                   <div class="identity-tile">
                     <div class="text-caption text-grey-7">審核人員</div>
                     <div class="text-weight-bold">{{ displayName }}</div>
                   </div>
-                  <q-select v-model="reviewForm.targetStatus" label="目標狀態" outlined dense :options="targetStatusOptions" emit-value map-options />
+                  <q-select
+                    v-model="reviewForm.targetStatus"
+                    label="審核結果"
+                    outlined
+                    dense
+                    :options="reviewTargetOptions"
+                    emit-value
+                    map-options
+                  />
                   <q-input
+                    v-if="requiresRejectionReason"
                     v-model="reviewForm.rejectionReason"
                     class="full-span"
-                    label="拒絕原因"
+                    :label="reviewForm.targetStatus === 'RETURN' ? '業務駁回原因' : '主管拒絕原因'"
                     outlined
                     type="textarea"
                     rows="3"
-                    hint="若選擇 REJECTED，請填寫原因"
+                    :hint="reviewForm.targetStatus === 'RETURN' ? '業務駁回時請填寫原因' : '主管拒絕時請填寫原因'"
                   />
                 </div>
 
-                <q-card flat bordered class="q-mt-md q-pa-md">
-                  <div class="text-weight-bold q-mb-sm">文件完整性檢核</div>
+                <q-card v-if="showDocumentCheck" flat bordered class="q-mt-md q-pa-md workbench-doc-card">
+                  <div class="text-weight-bold q-mb-sm text-primary">文件完整性檢核（主管審核）</div>
                   <q-checkbox v-model="reviewForm.docIdentity" label="身分證明" />
                   <q-checkbox v-model="reviewForm.docProposal" label="要保書" />
                   <q-checkbox v-model="reviewForm.docHealth" label="健康告知" />
                 </q-card>
 
                 <div class="q-mt-md">
-                  <q-btn color="teal-9" unelevated rounded label="送出審核" no-caps :loading="submitting" @click="handleReview" />
+                  <q-btn color="primary" unelevated label="送出審核" no-caps icon="check_circle" :loading="submitting" @click="handleReview" />
                 </div>
               </template>
+              </q-card-section>
             </q-card>
           </q-tab-panel>
         </q-tab-panels>
+        </div>
+
+        <aside class="workbench-aside">
+          <q-card flat class="page-card page-card--accent workbench-insight workbench-insight--rules">
+            <q-card-section>
+              <div class="text-subtitle1 text-weight-bold q-mb-md workbench-insight__title">即時規則提示</div>
+              <div class="hint-row"><span class="hint-label">保費比例</span><span>{{ premiumRatioHint }}</span></div>
+              <div class="hint-row"><span class="hint-label">核保風險等級</span><span>{{ riskLevelHint }}</span></div>
+              <div class="hint-row"><span class="hint-label">重複投保預警</span><span>{{ duplicateWarning }}</span></div>
+              <div class="hint-row hint-row--last"><span class="hint-label">文件檢核</span><span>{{ documentHint }}</span></div>
+            </q-card-section>
+          </q-card>
+
+          <q-card flat class="page-card page-card--accent workbench-insight workbench-insight--products">
+            <q-card-section>
+              <div class="row items-center no-wrap q-mb-md">
+                <div class="text-subtitle1 text-weight-bold workbench-insight__title col">商品參考</div>
+                <q-btn
+                  v-if="hasMoreProducts"
+                  flat
+                  dense
+                  round
+                  color="primary"
+                  :icon="productsExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down'"
+                  :aria-label="productsExpanded ? '收合商品列表' : '展開全部商品'"
+                  @click="productsExpanded = !productsExpanded"
+                />
+              </div>
+              <q-list separator class="workbench-product-list">
+                <q-item v-for="p in visibleProducts" :key="p.code" class="product-item">
+                  <q-item-section>
+                    <q-item-label class="text-weight-bold">{{ p.code }}</q-item-label>
+                    <q-item-label>{{ p.name }}</q-item-label>
+                    <q-item-label caption>年齡 {{ p.minInsuredAge }}-{{ p.maxInsuredAge }}，保額 {{ p.minSumInsured }}-{{ p.maxSumInsured }}</q-item-label>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+              <div
+                v-if="hasMoreProducts && !productsExpanded"
+                class="workbench-product-more text-caption text-grey-6 text-center q-pt-sm"
+              >
+                另有 {{ products.length - PRODUCT_PREVIEW_COUNT }} 項商品，點擊箭頭展開
+              </div>
+            </q-card-section>
+          </q-card>
+        </aside>
       </div>
-
-      <!-- 側欄 -->
-      <aside class="insight-column">
-        <q-card flat class="insight-card">
-          <div class="text-h6 q-mb-md">即時規則提示</div>
-          <div class="hint-row"><span class="hint-label">保費比例</span><span>{{ premiumRatioHint }}</span></div>
-          <div class="hint-row"><span class="hint-label">核保風險等級</span><span>{{ riskLevelHint }}</span></div>
-          <div class="hint-row"><span class="hint-label">重複投保預警</span><span>{{ duplicateWarning }}</span></div>
-          <div class="hint-row"><span class="hint-label">文件檢核</span><span>{{ documentHint }}</span></div>
-        </q-card>
-
-        <q-card flat class="insight-card">
-          <div class="text-h6 q-mb-md">商品參考</div>
-          <q-list separator>
-            <q-item v-for="p in products" :key="p.code" class="product-item">
-              <q-item-section>
-                <q-item-label class="text-weight-bold">{{ p.code }}</q-item-label>
-                <q-item-label>{{ p.name }}</q-item-label>
-                <q-item-label caption>年齡 {{ p.minInsuredAge }}-{{ p.maxInsuredAge }}，保額 {{ p.minSumInsured }}-{{ p.maxSumInsured }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </q-card>
-      </aside>
     </div>
-  </div>
+  </section>
+
+  <q-dialog v-model="historyDialogOpen" no-backdrop-dismiss>
+    <q-card class="history-dialog-card">
+      <q-card-section class="history-dialog-card__header row items-start no-wrap q-pb-sm">
+        <q-avatar rounded color="primary" text-color="white" icon="history" size="40px" class="q-mr-md" />
+        <div class="col">
+          <div class="text-h6 text-weight-bold text-grey-9">審核歷程</div>
+          <div class="text-caption text-grey-7 q-mt-xs">
+            申請編號
+            <q-badge outline color="grey-6" class="q-ml-xs history-dialog-card__policy-no">
+              {{ historyPolicyNo }}
+            </q-badge>
+          </div>
+        </div>
+        <q-btn icon="close" flat round dense color="grey-7" v-close-popup />
+      </q-card-section>
+
+      <q-separator />
+
+      <q-card-section class="relative-position history-dialog-body">
+        <PolicyHistoryTable :rows="historyRows" />
+        <q-inner-loading :showing="historyLoading" color="primary" />
+      </q-card-section>
+    </q-card>
+  </q-dialog>
 </template>
 
 <style scoped>
-.page-shell {
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 32px 24px 48px;
-  display: grid;
-  gap: 20px;
+.workbench-page {
+  --wb-primary: #48bb78;
+  --wb-primary-light: #68d391;
+  --wb-primary-pale: #f0fff4;
+  --wb-primary-dark: #38a169;
+  --wb-primary-deep: #2f855a;
+  --wb-ink: #1a202c;
+  --wb-muted: #64748b;
+  --wb-surface: #ffffff;
+  --wb-surface-muted: #f7faf9;
+  --wb-border: #d8e8de;
+  --wb-accent-blue: #3182ce;
+  --wb-accent-blue-deep: #2c5282;
+  --wb-aside-width: 260px;
+  background: linear-gradient(180deg, #f4fbf7 0%, #f8fafc 120px);
 }
 
-/* Header */
-.hero-panel {
-  display: grid;
-  grid-template-columns: 1.8fr 1fr;
-  gap: 24px;
-  padding: 28px;
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 24px 80px rgba(38, 57, 77, 0.12);
+.workbench-hero__inner {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  max-width: 1120px;
 }
 
-.eyebrow,
-.panel-kicker {
-  margin: 0 0 8px;
+.workbench-hero__copy {
+  max-width: 640px;
+}
+
+.workbench-hero__subtitle {
+  max-width: 52ch;
+  line-height: 1.55;
+}
+
+.workbench-eyebrow {
+  margin: 0 0 10px;
   text-transform: uppercase;
   letter-spacing: 0.16em;
-  color: #876445;
-  font-size: 12px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.6875rem;
   font-weight: 700;
 }
 
-/* 明確壓住 h1，避免 Quasar 的 6rem 把它放大 */
-.hero-panel h1 {
-  margin: 0;
-  font-family: "Noto Serif TC", serif;
-  font-size: 32px;
-  line-height: 1.2;
-  font-weight: 700;
-}
-
-.hero-copy {
-  line-height: 1.75;
-  margin-top: 12px;
-}
-
-.hero-side-card {
-  padding: 22px;
-  border-radius: 20px;
-  background: linear-gradient(180deg, #172b4d 0%, #10203a 100%);
-  color: #f9f5ef;
-}
-
-/* 分頁列 */
-.tab-card {
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.82);
-  padding: 4px 12px;
-}
-
-/* 主體：左內容 + 右側欄 */
-.workspace-grid {
+.workbench-workflow {
   display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: 20px;
-  align-items: start;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
 }
 
-.main-column {
+.workbench-workflow__step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 12px;
+  background: rgba(72, 187, 120, 0.14);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+
+.workbench-workflow__step:hover {
+  background: rgba(72, 187, 120, 0.24);
+  border-color: rgba(255, 255, 255, 0.45);
+  transform: translateY(-1px);
+}
+
+.workbench-workflow__step--active {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: var(--wb-primary);
+  color: var(--wb-ink);
+  box-shadow: 0 8px 24px rgba(47, 133, 90, 0.22);
+}
+
+.workbench-workflow__step--active .workbench-workflow__icon {
+  background: linear-gradient(135deg, var(--wb-primary) 0%, var(--wb-primary-dark) 100%);
+  color: #fff;
+}
+
+.workbench-workflow__step--active .workbench-workflow__desc {
+  color: var(--wb-muted);
+}
+
+.workbench-workflow__icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.workbench-workflow__step:not(.workbench-workflow__step--active) .workbench-workflow__icon {
+  background: rgba(44, 82, 130, 0.35);
+}
+
+.workbench-workflow__text {
+  display: grid;
+  gap: 2px;
   min-width: 0;
 }
 
-.transparent-panels {
+.workbench-workflow__label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.workbench-workflow__desc {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.3;
+}
+
+.workbench-body {
+  max-width: 1440px;
+}
+
+.workbench-tab-card {
+  margin-bottom: 16px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--wb-border);
+  border-top: 3px solid var(--wb-primary);
+  box-shadow: 0 4px 16px rgba(72, 187, 120, 0.1);
+  background: var(--wb-surface);
+}
+
+.workbench-tabs :deep(.q-tab) {
+  min-height: 50px;
+  padding: 0 22px;
+  font-weight: 600;
+  color: var(--wb-muted);
+}
+
+.workbench-tabs :deep(.q-tab--active) {
+  color: var(--wb-primary-dark);
+}
+
+.workbench-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--wb-aside-width);
+  gap: 18px;
+  align-items: start;
+}
+
+.workbench-main {
+  min-width: 0;
+}
+
+.workbench-panels {
   background: transparent;
 }
 
-.content-card,
-.insight-card {
-  padding: 28px;
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 18px 50px rgba(45, 62, 80, 0.08);
-}
-
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
+.workbench-panel {
+  border-radius: 14px;
+  border: 1px solid var(--wb-border);
+  box-shadow: 0 2px 10px rgba(72, 187, 120, 0.06);
 }
 
 .form-grid {
@@ -853,49 +1320,172 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
   display: grid;
   gap: 4px;
   align-content: center;
-  padding: 8px 14px;
-  border-radius: 14px;
-  background: #eef3f7;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--wb-primary-pale);
+  border: 1px solid #c6f6d5;
 }
 
-/* 側欄提示 */
-.insight-column {
+.workbench-aside {
   display: grid;
-  gap: 20px;
+  gap: 14px;
+  width: var(--wb-aside-width);
+  max-width: var(--wb-aside-width);
+  font-size: 0.875rem;
+}
+
+.workbench-insight {
+  border-radius: 14px;
+  border: 1px solid var(--wb-border);
+  background: var(--wb-surface);
+  box-shadow: 0 2px 8px rgba(72, 187, 120, 0.06);
+}
+
+.workbench-insight--rules {
+  border-left: 4px solid var(--wb-primary);
+  background: linear-gradient(135deg, #ffffff 0%, var(--wb-primary-pale) 100%);
+}
+
+.workbench-insight--products {
+  border-left: 4px solid var(--wb-accent-blue);
+  background: linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%);
+}
+
+.workbench-insight :deep(.q-card__section) {
+  padding: 14px 16px;
+}
+
+.workbench-insight .text-subtitle1,
+.workbench-insight__title {
+  font-size: 0.9375rem;
+  margin-bottom: 8px;
+  color: var(--wb-ink);
+}
+
+.workbench-doc-card {
+  background: var(--wb-primary-pale);
+  border-color: #c6f6d5;
 }
 
 .hint-row {
   display: grid;
-  gap: 2px;
-  padding: 10px 0;
-  border-bottom: 1px solid #eceff3;
+  gap: 4px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--wb-border);
+}
+
+.hint-row--last {
+  border-bottom: none;
 }
 
 .hint-label {
-  font-size: 12px;
-  color: #62707c;
+  font-size: 0.6875rem;
+  color: var(--wb-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  font-weight: 600;
 }
 
 .product-item {
-  padding-left: 0;
-  padding-right: 0;
+  padding: 6px 0;
+  min-height: auto;
+}
+
+.product-item :deep(.q-item__label) {
+  line-height: 1.35;
+}
+
+.workbench-table :deep(thead tr) {
+  background: var(--wb-primary-pale);
+}
+
+.workbench-table :deep(.q-table tbody td) {
+  font-size: 0.9rem;
+}
+
+.workbench-table :deep(.q-table thead th) {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--wb-ink);
+}
+
+.history-dialog-body {
+  min-height: 160px;
+  padding: 16px 20px 20px;
+  background: var(--wb-surface-muted);
+}
+
+.history-dialog-card {
+  min-width: 680px;
+  max-width: 95vw;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--wb-border);
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
+}
+
+.history-dialog-card__header {
+  padding: 18px 20px 14px;
+  background: linear-gradient(180deg, #ffffff 0%, var(--wb-surface-muted) 100%);
+}
+
+.history-dialog-card__policy-no {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+}
+
+.workbench-query-hint {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+}
+
+.workbench-policy-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--wb-primary-dark);
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.workbench-policy-link:hover {
+  color: #276749;
+}
+
+.workbench-product-list {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.workbench-product-more {
+  border-top: 1px dashed var(--wb-border);
 }
 
 @media (max-width: 1100px) {
-  .hero-panel,
-  .workspace-grid,
+  .workbench-workflow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workbench-grid,
   .form-grid {
     grid-template-columns: 1fr;
   }
+
+  .workbench-aside {
+    width: 100%;
+    max-width: none;
+  }
 }
 
-.back-link-btn {
-  color: #f4b860;
-  text-decoration: underline;
-  font-weight: 700;
-  padding: 0;
-  min-height: auto;
+@media (max-width: 600px) {
+  .workbench-workflow {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

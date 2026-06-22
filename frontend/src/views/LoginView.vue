@@ -58,7 +58,7 @@ async function handleLogin() {
             <path d="M24 12a7 7 0 0 1 7 7v2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H15a2 2 0 0 1-2-2V23a2 2 0 0 1 2-2h2v-2a7 7 0 0 1 7-7zm0 3a4 4 0 0 0-4 4v2h8v-2a4 4 0 0 0-4-4zm0 9a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" fill="white" />
           </svg>
         </div>
-        <h2 class="brand-title">約訪管理系統</h2>
+        <h2 class="brand-title">後臺管理系統</h2>
       </div>
     </div>
 

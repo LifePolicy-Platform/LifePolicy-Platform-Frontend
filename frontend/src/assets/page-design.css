@@ -1,0 +1,363 @@
+/* ============================================================
+   全站頁面設計系統（對齊 Dashboard Notus 綠白風格）
+   ============================================================ */
+
+:root {
+  --page-hero-gradient: linear-gradient(
+    125deg,
+    #2c5282 0%,
+    #2b7a9e 18%,
+    #2f855a 42%,
+    #38a169 62%,
+    #48bb78 85%,
+    #68d391 100%
+  );
+}
+
+.page-with-hero {
+  --notus-green: #48bb78;
+  --notus-green-dark: #38a169;
+  --notus-green-deep: #2f855a;
+  --notus-green-light: #9ae6b4;
+  --notus-green-pale: #c6f6d5;
+  --notus-green-soft: #f0fff4;
+  --notus-charcoal: #1a202c;
+  --notus-text: #2d3748;
+  --notus-muted: #718096;
+  --notus-border: #e2e8f0;
+  --notus-surface: #ffffff;
+  --notus-bg: #f7fafc;
+  --page-shadow-sm: 0 2px 8px rgba(16, 24, 40, 0.05);
+  --page-shadow-md: 0 8px 24px rgba(16, 24, 40, 0.08);
+  --page-shadow-lg: 0 16px 40px rgba(16, 24, 40, 0.1);
+  --page-radius: 12px;
+}
+
+/* ---- Hero 裝飾光斑 ---- */
+.page-hero {
+  position: relative;
+  overflow: hidden;
+  min-height: clamp(148px, 18vh, 200px);
+  padding: calc(var(--chrome-height) + 12px) 28px 72px;
+  background: var(--page-hero-gradient);
+}
+
+.page-hero__blobs {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.page-hero__blob {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  filter: blur(0);
+}
+
+.page-hero__blob--1 {
+  width: 280px;
+  height: 280px;
+  top: -80px;
+  right: -40px;
+}
+
+.page-hero__blob--2 {
+  width: 180px;
+  height: 180px;
+  bottom: -60px;
+  left: 12%;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.page-hero__blob--3 {
+  width: 120px;
+  height: 120px;
+  top: 20%;
+  right: 28%;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.page-hero__inner {
+  position: relative;
+  z-index: 1;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.page-hero__title {
+  margin: 0;
+  color: #ffffff;
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.page-hero__subtitle {
+  margin: 8px 0 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.92rem;
+  font-weight: 500;
+  max-width: 52ch;
+  line-height: 1.55;
+}
+
+/* Dashboard 等較矮 Hero（保留原高度，特效與一般 Hero 一致） */
+.page-hero--compact {
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: clamp(108px, 13vh, 148px);
+  padding: calc(var(--chrome-height) + 6px) 20px 44px;
+}
+
+.page-hero--compact .page-hero__inner {
+  max-width: 980px;
+  padding: 0 16px;
+}
+
+.page-hero--compact .page-hero__blob--1 {
+  width: 200px;
+  height: 200px;
+  top: -64px;
+  right: -28px;
+}
+
+.page-hero--compact .page-hero__blob--2 {
+  width: 140px;
+  height: 140px;
+  bottom: -48px;
+  left: 8%;
+}
+
+.page-hero--compact .page-hero__blob--3 {
+  width: 96px;
+  height: 96px;
+  top: 18%;
+  right: 22%;
+}
+
+.page-body {
+  flex: 1 1 auto;
+  max-width: 1200px;
+  width: 100%;
+  margin: -48px auto 0;
+  padding: 0 28px 36px;
+  display: grid;
+  gap: 16px;
+  background: transparent;
+}
+
+/* ---- 卡片系統 ---- */
+.page-card {
+  background: var(--notus-surface);
+  border: 1px solid var(--notus-border);
+  border-radius: var(--page-radius);
+  box-shadow: var(--page-shadow-sm);
+  transition:
+    box-shadow 0.22s ease,
+    transform 0.22s ease,
+    border-color 0.22s ease;
+}
+
+.page-card:hover {
+  box-shadow: var(--page-shadow-md);
+}
+
+.page-card--filter {
+  border-top: 3px solid var(--notus-green);
+}
+
+.page-card--data {
+  border-top: 3px solid var(--notus-green-pale);
+}
+
+.page-card--accent {
+  border-top: 3px solid var(--notus-green-dark);
+}
+
+.page-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.page-card__kicker {
+  margin: 0 0 4px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--notus-green-dark);
+}
+
+.page-card__title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--notus-charcoal);
+  line-height: 1.35;
+}
+
+.page-card__desc {
+  margin: 4px 0 0;
+  font-size: 0.875rem;
+  color: var(--notus-muted);
+}
+
+/* Hero 內浮動資訊卡 */
+.page-hero-card {
+  border-radius: var(--page-radius);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--page-shadow-lg);
+  backdrop-filter: blur(8px);
+}
+
+.page-hero-card--dark {
+  background: linear-gradient(160deg, rgba(26, 32, 44, 0.92) 0%, rgba(15, 23, 42, 0.88) 100%);
+  color: #f7fafc;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ---- 表格 ---- */
+.app-table thead tr {
+  background: var(--notus-green-soft);
+}
+
+.app-table thead th {
+  color: var(--notus-green-deep);
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+.app-table tbody tr:hover td {
+  background: rgba(72, 187, 120, 0.06);
+}
+
+.app-table .q-table__bottom {
+  border-top-color: var(--notus-border);
+}
+
+/* ---- 表單區塊 ---- */
+.page-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.page-form-grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.page-form-section {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--notus-border);
+}
+
+.page-form-section__title {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--notus-green-deep);
+}
+
+/* Quasar 輸入框 focus 光暈 */
+.page-with-hero .q-field--outlined.q-field--focused .q-field__control {
+  box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.15);
+}
+
+/* ---- 狀態訊息 ---- */
+.page-alert {
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.page-alert--success {
+  background: #f0fff4;
+  border: 1px solid #c6f6d5;
+  color: #276749;
+}
+
+.page-alert--error {
+  background: #fff5f5;
+  border: 1px solid #fed7d7;
+  color: #c53030;
+}
+
+.page-alert--warning {
+  background: #fffbeb;
+  border: 1px solid #feebc8;
+  color: #b7791f;
+}
+
+/* ---- Tab 導覽卡 ---- */
+.page-tab-card {
+  border-radius: var(--page-radius);
+  overflow: hidden;
+  background: var(--notus-surface);
+  box-shadow: var(--page-shadow-sm);
+}
+
+.page-tab-card .q-tabs {
+  padding: 0 8px;
+}
+
+.page-tab-card .q-tab {
+  min-height: 48px;
+  font-weight: 600;
+}
+
+/* ---- 空狀態 ---- */
+.page-empty {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--notus-muted);
+}
+
+.page-empty__icon {
+  font-size: 40px;
+  color: var(--notus-green-light);
+  margin-bottom: 8px;
+}
+
+.notes-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.demo-grid {
+  display: grid;
+  gap: 16px;
+}
+
+@media (max-width: 760px) {
+  .page-hero {
+    min-height: 132px;
+    padding: calc(var(--chrome-height) + 8px) 20px 64px;
+  }
+
+  .page-hero--compact {
+    min-height: 100px;
+    padding: calc(var(--chrome-height) + 4px) 16px 36px;
+  }
+
+  .page-body {
+    margin-top: -40px;
+    padding: 0 20px 28px;
+  }
+
+  .page-form-grid,
+  .page-form-grid--3 {
+    grid-template-columns: 1fr;
+  }
+
+  .notes-grid {
+    grid-template-columns: 1fr;
+  }
+}

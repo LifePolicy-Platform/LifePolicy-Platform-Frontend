@@ -53,11 +53,6 @@ const hasResults = computed(() => filteredGroups.value.length > 0)
 
 <template>
   <aside class="app-sidebar">
-    <div class="sidebar-topbar">
-      <div class="sidebar-logo" aria-label="系統 Logo">
-        <q-icon name="eco" size="22px" class="sidebar-logo__icon" />
-      </div>
-    </div>
 
     <div class="sidebar-search">
       <q-input

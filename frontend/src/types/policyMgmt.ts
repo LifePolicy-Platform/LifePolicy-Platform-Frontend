@@ -6,6 +6,9 @@ export type PolicyStatus =
   | 'rejected'
   | 'expired'
 
+export type ProductStatus = 'ACTIVE' | 'INACTIVE'
+
+export type ProductType = 'LIFE' | 'HEALTH' | 'ACCIDENT' | 'ANNUITY' | 'TRAVEL'
 export interface PolicyListItem {
   policyNo: string
   productName: string
@@ -40,12 +43,16 @@ export interface PolicyDetail {
 }
 
 export interface PolicyHistoryItem {
+  id?: string | number
   time: string
-  eventName: string
   status: string
+  statusCode?: string
   handler: string
-  reason: string
   remark: string
+  /** @deprecated 歷程表已移除事件欄，mock 資料相容用 */
+  eventName?: string
+  /** @deprecated 歷程表已移除原因欄，mock 資料相容用 */
+  reason?: string
 }
 
 export interface PolicySearchFilter {

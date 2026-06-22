@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
+import PageHero from '@/components/layout/PageHero.vue'
 import PolicySearchForm from '../components/policy/PolicySearchForm.vue'
 import PolicyResultsPanel from '../components/policy/PolicyResultsPanel.vue'
 import { searchPolicies } from '../services/policyService'
@@ -64,37 +65,51 @@ async function handleSearch() {
 </script>
 
 <template>
-  <section class="demo-grid">
-    <PolicySearchForm
-      v-model="policyKeyword"
-      :formatted-keyword="formattedPolicyKeyword"
-      @search="handleSearch"
-    />
-    <PolicyResultsPanel
-      :loading="queryState.loading"
-      :error-message="queryState.errorMessage"
-      :has-searched="queryState.hasSearched"
-      :results="queryState.results"
-      :result-count-text="resultCountText"
-    />
-  </section>
+  <section class="page-with-hero">
+    <PageHero title="保單查詢示範" subtitle="元件拆分練習：表單輸入與結果顯示分離" />
 
-  <section class="notes-grid">
-    <article class="card note-card">
-      <h2>元件拆分理由</h2>
-      <p>查詢表單負責輸入與送出，結果元件負責呈現資料，父層負責把流程串起來。</p>
-    </article>
-    <article class="card note-card">
-      <h2>props / emit</h2>
-      <p>資料向下傳給子元件，事件向上回到父元件，這樣狀態來源會比較單純。</p>
-    </article>
-    <article class="card note-card">
-      <h2>slot 使用時機</h2>
-      <p>共用區塊標題不只是一段字，可能還有副標與說明，所以用 slot 比單一 title props 更彈性。</p>
-    </article>
-    <article class="card note-card">
-      <h2>Pinia 可應用在哪裡</h2>
-      <p>這題如果要跨頁保留查詢草稿、快取查詢結果，或記錄最近查詢過的保單號，就很適合把這些狀態交給 Pinia 管理。</p>
-    </article>
+    <div class="page-body">
+      <div class="demo-grid">
+        <PolicySearchForm
+          v-model="policyKeyword"
+          :formatted-keyword="formattedPolicyKeyword"
+          @search="handleSearch"
+        />
+        <PolicyResultsPanel
+          :loading="queryState.loading"
+          :error-message="queryState.errorMessage"
+          :has-searched="queryState.hasSearched"
+          :results="queryState.results"
+          :result-count-text="resultCountText"
+        />
+      </div>
+
+      <div class="notes-grid q-mt-md">
+        <q-card flat class="page-card note-card">
+          <q-card-section>
+            <div class="page-card__title">元件拆分理由</div>
+            <p class="page-card__desc q-mt-sm q-mb-none">查詢表單負責輸入與送出，結果元件負責呈現資料，父層負責把流程串起來。</p>
+          </q-card-section>
+        </q-card>
+        <q-card flat class="page-card note-card">
+          <q-card-section>
+            <div class="page-card__title">props / emit</div>
+            <p class="page-card__desc q-mt-sm q-mb-none">資料向下傳給子元件，事件向上回到父元件，這樣狀態來源會比較單純。</p>
+          </q-card-section>
+        </q-card>
+        <q-card flat class="page-card note-card">
+          <q-card-section>
+            <div class="page-card__title">slot 使用時機</div>
+            <p class="page-card__desc q-mt-sm q-mb-none">共用區塊標題不只是一段字，可能還有副標與說明，所以用 slot 比單一 title props 更彈性。</p>
+          </q-card-section>
+        </q-card>
+        <q-card flat class="page-card note-card">
+          <q-card-section>
+            <div class="page-card__title">Pinia 可應用在哪裡</div>
+            <p class="page-card__desc q-mt-sm q-mb-none">跨頁保留查詢草稿、快取查詢結果，或記錄最近查詢過的保單號，就很適合把這些狀態交給 Pinia 管理。</p>
+          </q-card-section>
+        </q-card>
+      </div>
+    </div>
   </section>
 </template>

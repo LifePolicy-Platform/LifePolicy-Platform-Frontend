@@ -31,20 +31,31 @@ const columns = [
     <PageHero title="審核保單" subtitle="待核保件列表（權限控管後續實作）" />
 
     <div class="page-body">
-      <q-card flat class="page-card">
+      <q-card flat class="page-card page-card--data">
         <q-card-section>
+          <div class="page-card__header q-mb-md">
+            <div>
+              <p class="page-card__kicker">REVIEW QUEUE</p>
+              <div class="page-card__title">待審保單</div>
+              <p class="page-card__desc">共 {{ reviewList.length }} 筆待處理</p>
+            </div>
+          </div>
           <q-table
+            class="app-table"
             :rows="reviewList"
             :columns="columns"
             row-key="policyNo"
             flat
             bordered
+            dense
             :loading="isReviewLoading"
             no-data-label="目前無待審件"
           >
             <template #body-cell-policyStatus="props">
               <q-td :props="props">
-                {{ statusLabel(props.row.policyStatus) }}
+                <q-chip dense size="sm" color="warning" text-color="white">
+                  {{ statusLabel(props.row.policyStatus) }}
+                </q-chip>
               </q-td>
             </template>
             <template #body-cell-actions="props">

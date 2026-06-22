@@ -33,13 +33,18 @@ const {
 
 <template>
   <section class="page-with-hero appt-update-page">
-    <PageHero title="重新安排約訪時間" subtitle="查詢未完成訪名單並重新設定約訪時間" />
+    <PageHero title="重新安排約訪" subtitle="查詢未完成訪名單並重新設定約訪時間" />
 
     <div class="page-body appt-body">
-      <q-card flat class="appt-card page-card">
+      <q-card flat class="page-card page-card--accent appt-card">
         <q-card-section class="appt-card__section">
-          <p class="section-label">查詢條件</p>
-          <div class="block-title">尚未完成的訪名單如下：</div>
+          <div class="page-card__header q-mb-md">
+            <div>
+              <p class="page-card__kicker">APPOINTMENT</p>
+              <div class="page-card__title">查詢條件</div>
+              <p class="page-card__desc">尚未完成的訪名單如下</p>
+            </div>
+          </div>
 
           <AptSearchForm
             v-model:search-start-date="searchStartDate"

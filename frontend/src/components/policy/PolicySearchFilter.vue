@@ -20,9 +20,14 @@ const statusOptions = [
 </script>
 
 <template>
-  <q-card flat class="page-card q-mb-md">
+  <q-card flat class="page-card page-card--filter q-mb-md">
     <q-card-section>
-      <div class="text-subtitle1 q-mb-md">查詢條件</div>
+      <div class="page-card__header q-mb-sm">
+        <div>
+          <p class="page-card__kicker">FILTER</p>
+          <div class="page-card__title">查詢條件</div>
+        </div>
+      </div>
       <div class="row q-col-gutter-md">
         <div class="col-12 col-sm-6 col-md-3">
           <q-input v-model="filter.policyNo" label="保單號碼" dense outlined clearable />
@@ -48,7 +53,7 @@ const statusOptions = [
           <q-input v-model="filter.effectiveDateTo" label="生效日迄" dense outlined type="date" />
         </div>
         <div class="col-12 col-sm-6 col-md-3 flex items-end q-gutter-sm">
-          <q-btn color="primary" label="查詢" icon="search" @click="$emit('search')" />
+          <q-btn color="primary" unelevated label="查詢" icon="search" @click="$emit('search')" />
           <q-btn flat label="清除" @click="$emit('reset')" />
         </div>
       </div>

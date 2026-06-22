@@ -2,16 +2,18 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import {
   Quasar, Dialog, Notify, ClosePopup,
-  QBanner, QBtn, QCard, QCardSection, QCheckbox, QChip, QDate, QIcon,
-  QImg, QInput, QItem, QItemLabel, QItemSection, QList, QPopupProxy, QRadio,
-  QSelect, QSeparator, QTab, QTable, QPagination, QTabPanel, QTabPanels, QTabs, QTd, QTime, QTr,
-  QPage, QDialog, QSpace, QCardActions,
-  QBadge
+  QBadge, QBanner, QBar, QBtn, QCard, QCardActions, QCardSection,
+  QCheckbox, QChip, QDate, QDialog, QIcon, QImg, QInnerLoading,
+  QInput, QItem, QItemLabel, QItemSection, QList, QOptionGroup,
+  QPage, QPagination, QPopupProxy, QRadio, QSelect, QSeparator,
+  QSpace, QSpinner, QTab, QTable, QTabPanel, QTabPanels, QTabs,
+  QTd, QTime, QToggle, QTr,QAvatar
 } from 'quasar'
 import quasarLang from 'quasar/lang/zh-TW'
 import router from './router/index.ts'
 import './style.css'
 import './assets/dashboard.css'
+import './assets/page-design.css'
 import App from './App.vue'
 
 import '@quasar/extras/material-icons/material-icons.css'
@@ -32,11 +34,10 @@ app.use(Quasar, {
     },
   },
   components: {
-    QBanner, QBtn, QCard, QCardSection, QCheckbox, QChip, QDate, QIcon, QImg, QInput,
+    QBanner, QBtn, QCard, QCardSection, QCheckbox, QChip, QDate, QDialog, QIcon, QImg, QInput,
     QItem, QItemLabel, QItemSection, QList, QPopupProxy, QRadio,
     QSelect, QSeparator, QTab, QTable, QPagination, QTabPanel, QTabPanels, QTabs, QTd, QTime, QTr,
-    QPage, QDialog, QSpace, QCardActions,
-    QBadge
+    QPage, QSpace, QCardActions,QBadge,QInnerLoading,QAvatar
   },
   directives: {
     ClosePopup,
