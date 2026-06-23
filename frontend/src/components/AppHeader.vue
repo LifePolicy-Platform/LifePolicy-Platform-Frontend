@@ -77,9 +77,9 @@ function handleLogout() {
         </button>
 
         <div v-if="menuOpen" class="header-dropdown">
-          <button type="button" class="header-dropdown__item" disabled>
+          <!-- <button type="button" class="header-dropdown__item" disabled>
             個人資料調整
-          </button>
+          </button> -->
           <button type="button" class="header-dropdown__item" @click="handleLogout">
             登出
           </button>

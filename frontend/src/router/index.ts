@@ -53,7 +53,7 @@ const router = createRouter({
       path: '/home',
       name: 'home',
       component: HomeView,
-      meta: { title: '首頁 Dashboard', label: '首頁 Dashboard', hasTopHero: true },
+      meta: { title: '首頁 數據分析', label: '首頁 數據分析', hasTopHero: true },
     },
     {
       path: '/my-tasks',

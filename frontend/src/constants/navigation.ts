@@ -19,7 +19,7 @@ export const sidebarNavItems: SidebarNavItem[] = [
   // { group: '專案練習', groupOrder: 0, path: '/policies', label: '保單查詢練習', title: '保單查詢元件拆分示範', icon: 'policy' },
 
   // 我的工作台
-  { group: '我的工作台', groupOrder: 1, path: '/home', label: '首頁 Dashboard', title: '首頁 Dashboard', icon: 'dashboard' },
+  { group: '我的工作台', groupOrder: 1, path: '/home', label: '首頁', title: '首頁', icon: 'dashboard' },
   { group: '我的工作台', groupOrder: 1, path: '/my-tasks', label: '個人待辦案件', title: '個人待辦案件', icon: 'assignment' },
 
   // 保單作業
