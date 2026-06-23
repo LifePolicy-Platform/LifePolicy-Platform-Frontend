@@ -257,7 +257,7 @@ watch(historyRows, () => {
                           <div class="col">
                             <div class="upd-time-schedule-card__title">指定約訪時間</div>
                             <p class="upd-time-schedule-card__desc">
-                              僅處理勾選名單中約訪時間最早的一筆；
+                              僅處理勾選名單中約訪時間最早的一筆
                             </p>
                             <div class="upd-time-specific-grid">
                               <q-input v-model="specificDate" label="約訪日期" type="date" stack-label outlined dense
@@ -293,7 +293,7 @@ watch(historyRows, () => {
                     <div>
                       <p class="page-card__kicker">HISTORY</p>
                       <div class="page-card__title">查詢條件</div>
-                      <p class="page-card__desc">輸入客戶姓名查詢約訪歷程（僅查詢，不提供重新安排）</p>
+                      <p class="page-card__desc">輸入客戶姓名查詢約訪紀錄</p>
                     </div>
                   </div>
 

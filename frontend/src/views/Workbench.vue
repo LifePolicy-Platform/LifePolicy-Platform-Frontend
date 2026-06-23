@@ -488,7 +488,7 @@ function hasQueryCriteria(): boolean {
 async function handleQuery(options?: { silent?: boolean }) {
   if (!hasQueryCriteria()) {
     if (!options?.silent) {
-      notifyError('查詢至少要填一個條件，或指定一段送件時間')
+      notifyError('查詢至少需要一個條件')
     }
     return
   }
@@ -768,6 +768,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
               <div class="page-card__header">
                 <div>
                   <p class="page-card__kicker">New policy application</p>
+                  <p style="color: red; margin-bottom: 5px;">* 所有欄位皆為必填 </p>
                   <div class="page-card__title">新增投保案件</div>
                 </div>
                 <q-btn outline color="primary" label="檢查重複投保" no-caps icon="warning_amber" @click="runDuplicateCheck(createForm, null)" />
@@ -828,7 +829,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   />
                 </div>
                 <div class="q-mt-md">
-                  <q-btn color="primary" unelevated label="送出新增" no-caps icon="send" :loading="submitting" @click="handleCreate" />
+                  <q-btn color="primary" unelevated label="送出新增" no-caps :loading="submitting" @click="handleCreate" />
                 </div>
               </template>
               </q-card-section>
