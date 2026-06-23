@@ -86,14 +86,23 @@ const appointmentDisableReason = computed(() => {
   return ''
 })
 
-
+const pendingRecallTime = computed(() => {
+  const ctx = appointmentContext.value
+  if (!ctx) return null
+  const pending = appointmentRows.value.find(
+    (row) =>
+      row.recallResult === 0 &&
+      (ctx.pendingAppointmentSno == null || row.sno === ctx.pendingAppointmentSno),
+  )
+  return pending?.recallTime ?? null
+})
 
 const appointmentColumns = [
   { name: 'recNo', label: '約訪序號', field: 'recNo', align: 'left' as const },
   { name: 'projectName', label: '專案名稱', field: 'projectName', align: 'left' as const },
   { name: 'recallTime', label: '約訪時間', field: 'recallTime', align: 'left' as const },
+    { name: 'recTime', label: '實際約訪時間', field: 'recTime', align: 'left' as const },
   { name: 'recallResult', label: '約訪結果', field: 'recallResult', align: 'left' as const },
-  { name: 'recTime', label: '回訪時間', field: 'recTime', align: 'left' as const },
 ]
 
 const premiumRatioText = computed(() => {
@@ -220,12 +229,13 @@ function openResultDialog() {
   resultDialogOpen.value = true
 }
 
-async function handleConfirmAppointmentResult(recallResult: number) {
+async function handleConfirmAppointmentResult(payload: { recallResult: number; recTime?: string }) {
   resultSaving.value = true
   try {
     await confirmCallAppointmentResult({
       policyNo: policyNo.value,
-      recallResult,
+      recallResult: payload.recallResult,
+      ...(payload.recTime ? { recTime: payload.recTime } : {}),
     })
     $q.notify({ type: 'positive', message: '約訪結果已確認', position: 'top' })
     resultDialogOpen.value = false
@@ -304,16 +314,8 @@ onMounted(loadPolicy)
 <template>
   <section class="policy-content-page">
     <div class="policy-content-page__toolbar">
-      <q-btn
-        flat
-        round
-        dense
-        icon="arrow_back"
-        color="grey-8"
-        aria-label="返回上一頁"
-        class="policy-content-page__back"
-        @click="goBack"
-      />
+      <q-btn flat round dense icon="arrow_back" color="grey-8" aria-label="返回上一頁" class="policy-content-page__back"
+        @click="goBack" />
       <div>
         <h1 class="policy-content-page__title">保單內容</h1>
         <p class="policy-content-page__subtitle">檢視投保案件完整資料與審核歷程</p>
@@ -338,12 +340,8 @@ onMounted(loadPolicy)
             </div>
           </div>
           <div class="col-auto">
-            <q-chip
-              dense
-              :color="applicationStatusColor(record.APPLICATION_STATUS)"
-              text-color="white"
-              class="policy-content-summary__status"
-            >
+            <q-chip dense :color="applicationStatusColor(record.APPLICATION_STATUS)" text-color="white"
+              class="policy-content-summary__status">
               {{ applicationStatusLabel(record.APPLICATION_STATUS) }}
             </q-chip>
           </div>
@@ -460,41 +458,18 @@ onMounted(loadPolicy)
                 <q-icon name="event_available" color="primary" size="20px" />
                 <span>約訪記錄</span>
               </div>
-              <q-btn
-                v-if="showConfirmResultButton"
-                color="secondary"
-                outline
-                dense
-                icon="fact_check"
-                label="約訪結果確認"
-                @click="handleAppointmentAction"
-              />
-              <q-btn
-                v-else
-                color="primary"
-                outline
-                dense
-                icon="add"
-                label="新增約訪"
-                :disable="!canShowAddAppointmentButton"
-                @click="handleAppointmentAction"
-              >
+              <q-btn v-if="showConfirmResultButton" color="secondary" outline dense icon="fact_check" label="約訪結果確認"
+                @click="handleAppointmentAction" />
+              <q-btn v-else color="primary" outline dense icon="add" label="新增約訪"
+                :disable="!canShowAddAppointmentButton" @click="handleAppointmentAction">
                 <q-tooltip v-if="appointmentDisableReason">
                   {{ appointmentDisableReason }}
                 </q-tooltip>
               </q-btn>
             </div>
             <div class="relative-position policy-content-history">
-              <q-table
-                flat
-                bordered
-                :rows="appointmentRows"
-                :columns="appointmentColumns"
-                row-key="sno"
-                hide-pagination
-                :pagination="{ rowsPerPage: 0 }"
-                no-data-label="尚無約訪記錄"
-              >
+              <q-table flat bordered :rows="appointmentRows" :columns="appointmentColumns" row-key="sno" hide-pagination
+                :pagination="{ rowsPerPage: 0 }" no-data-label="尚無約訪記錄">
                 <template #body-cell-recallTime="props">
                   <q-td :props="props">
                     {{ formatDate(props.row.recallTime) }}
@@ -502,12 +477,7 @@ onMounted(loadPolicy)
                 </template>
                 <template #body-cell-recallResult="props">
                   <q-td :props="props">
-                    <q-chip
-                      dense
-                      size="sm"
-                      :color="recallResultColor(props.row.recallResult)"
-                      text-color="white"
-                    >
+                    <q-chip dense size="sm" :color="recallResultColor(props.row.recallResult)" text-color="white">
                       {{ recallResultLabel(props.row.recallResult) }}
                     </q-chip>
                   </q-td>
@@ -537,17 +507,12 @@ onMounted(loadPolicy)
         </q-card>
       </div>
 
-      <PolicyAppointmentDialog
-        v-model="appointmentDialogOpen"
-        :context="appointmentContext"
-        :projects="activeProjects"
-        :projects-loading="projectsLoading"
-        :saving="appointmentSaving"
-        @submit="handleCreateAppointment"
-      />
+      <PolicyAppointmentDialog v-model="appointmentDialogOpen" :context="appointmentContext" :projects="activeProjects"
+        :projects-loading="projectsLoading" :saving="appointmentSaving" @submit="handleCreateAppointment" />
       <PolicyAppointmentResultDialog
         v-model="resultDialogOpen"
         :saving="resultSaving"
+        :recall-time="pendingRecallTime"
         @submit="handleConfirmAppointmentResult"
       />
     </template>
@@ -712,6 +677,7 @@ onMounted(loadPolicy)
 }
 
 @media (max-width: 900px) {
+
   .policy-content-grid,
   .policy-content-dl--cols,
   .policy-content-metrics {

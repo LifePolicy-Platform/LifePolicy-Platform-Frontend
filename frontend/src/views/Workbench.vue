@@ -23,6 +23,7 @@ import {
   reviewSuccessMessage,
   SUPERVISOR_REVIEW_OPTIONS,
 } from '@/constants/applicationStatus'
+import { formatCurrency, parseCurrencyInput } from '@/utils/currency'
 
 type ProductOption = { label: string; value: string }
 
@@ -101,8 +102,8 @@ async function loadProducts() {
 
 // ---- q-select 用的選項 ----
 const genderOptions = [
-  { label: 'MALE', value: 'MALE' },
-  { label: 'FEMALE', value: 'FEMALE' }
+  { label: '男', value: 'MALE' },
+  { label: '女', value: 'FEMALE' }
 ]
 const statusOptions = [
   { label: '全部', value: '' },
@@ -257,6 +258,8 @@ const columns = [
   { name: 'applicant', label: '投保人', field: 'APPLICANT_NAME', align: 'left' as const },
   { name: 'insured', label: '被保人', field: 'INSURED_NAME', align: 'left' as const },
   { name: 'product', label: '商品', field: 'PRODUCT_CODE', align: 'left' as const },
+  { name: 'sumInsured', label: '保額', field: 'SUM_INSURED', align: 'right' as const },
+  { name: 'annualPremium', label: '年繳保費', field: 'ANNUAL_PREMIUM', align: 'right' as const },
   { name: 'status', label: '狀態', field: 'APPLICATION_STATUS', align: 'left' as const },
   { name: 'risk', label: '風險', field: 'RISK_LEVEL', align: 'left' as const },
   { name: 'ratio', label: '保費比例', field: 'PREMIUM_RATIO', align: 'left' as const },
@@ -755,7 +758,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
         </q-tabs>
         <q-separator />
       </q-card> -->
-      <div class="workbench-grid">
+      <div class="workbench-grid" :class="{ 'workbench-grid--no-aside': activeTab !== 'create' }">
         <div class="workbench-main">
           <q-tab-panels v-model="activeTab" animated class="workbench-panels bg-transparent">
           <!-- 新增 -->
@@ -805,8 +808,24 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                       </q-item>
                     </template>
                   </q-select>
-                  <q-input v-model="createForm.sumInsured" label="保額" outlined dense stack-label type="number" />
-                  <q-input v-model="createForm.annualPremium" label="年繳保費" outlined dense stack-label type="number" />
+                  <q-input
+                    :model-value="formatCurrency(createForm.sumInsured, '')"
+                    label="保額"
+                    outlined
+                    dense
+                    stack-label
+                    inputmode="numeric"
+                    @update:model-value="createForm.sumInsured = parseCurrencyInput($event)"
+                  />
+                  <q-input
+                    :model-value="formatCurrency(createForm.annualPremium, '')"
+                    label="年繳保費"
+                    outlined
+                    dense
+                    stack-label
+                    inputmode="numeric"
+                    @update:model-value="createForm.annualPremium = parseCurrencyInput($event)"
+                  />
                 </div>
                 <div class="q-mt-md">
                   <q-btn color="primary" unelevated label="送出新增" no-caps icon="send" :loading="submitting" @click="handleCreate" />
@@ -911,6 +930,16 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                       <small class="text-grey-6">{{ props.row.PRODUCT_CODE }}</small>
                     </q-td>
                   </template>
+                  <template #body-cell-sumInsured="props">
+                    <q-td :props="props" class="text-right">
+                      <span class="workbench-amount">{{ formatCurrency(props.row.SUM_INSURED) }}</span>
+                    </q-td>
+                  </template>
+                  <template #body-cell-annualPremium="props">
+                    <q-td :props="props" class="text-right">
+                      <span class="workbench-amount">{{ formatCurrency(props.row.ANNUAL_PREMIUM) }}</span>
+                    </q-td>
+                  </template>
                   <template #body-cell-status="props">
                     <q-td :props="props">
                       <q-chip
@@ -1009,8 +1038,24 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                       </q-item>
                     </template>
                   </q-select>
-                  <q-input v-model="editForm.sumInsured" label="保額" outlined dense stack-label type="number" />
-                  <q-input v-model="editForm.annualPremium" label="年繳保費" outlined dense stack-label type="number" />
+                  <q-input
+                    :model-value="formatCurrency(editForm.sumInsured, '')"
+                    label="保額"
+                    outlined
+                    dense
+                    stack-label
+                    inputmode="numeric"
+                    @update:model-value="editForm.sumInsured = parseCurrencyInput($event)"
+                  />
+                  <q-input
+                    :model-value="formatCurrency(editForm.annualPremium, '')"
+                    label="年繳保費"
+                    outlined
+                    dense
+                    stack-label
+                    inputmode="numeric"
+                    @update:model-value="editForm.annualPremium = parseCurrencyInput($event)"
+                  />
                   <q-input v-model="editForm.contactPhone" label="聯絡電話" outlined dense maxlength="10" />
                 </div>
                 <div class="q-mt-md">
@@ -1090,7 +1135,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
         </q-tab-panels>
         </div>
 
-        <aside class="workbench-aside">
+        <aside v-if="activeTab === 'create'" class="workbench-aside">
           <q-card flat class="page-card page-card--accent workbench-insight workbench-insight--rules">
             <q-card-section>
               <div class="text-subtitle1 text-weight-bold q-mb-md workbench-insight__title">即時規則提示</div>
@@ -1122,7 +1167,9 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                     <q-item-label class="text-weight-bold">{{ p.code }}</q-item-label>
                     <q-item-label>{{ p.name }}</q-item-label>
                     <q-item-label caption>年齡 {{ p.minInsuredAge }}-{{ p.maxInsuredAge }}</q-item-label>
-                    <q-item-label caption>保額 {{ p.minSumInsured }}-{{ p.maxSumInsured }}</q-item-label>
+                    <q-item-label caption>
+                      保額 {{ formatCurrency(p.minSumInsured) }} ~ {{ formatCurrency(p.maxSumInsured) }}
+                    </q-item-label>
                   </q-item-section>
                 </q-item>
               </q-list>
@@ -1316,6 +1363,10 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
   align-items: start;
 }
 
+.workbench-grid--no-aside {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .workbench-main {
   min-width: 0;
 }
@@ -1489,6 +1540,11 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
 
 .workbench-product-more {
   border-top: 1px dashed var(--wb-border);
+}
+
+.workbench-amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
 }
 
 @media (max-width: 1100px) {

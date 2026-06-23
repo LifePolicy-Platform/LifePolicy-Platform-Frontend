@@ -27,6 +27,15 @@ export async function fetchAptRecords(params: AptRecordListRequest) {
   return unwrapCustomerData(response)
 }
 
+/** 依客戶姓名查詢約訪歷程 */
+export async function fetchAptRecordsByCustName(custName: string) {
+  const response = await http.get<ApiEnvelope<AptRecordListResponse[]>>(
+    '/api/apt-records/history',
+    { params: { name: custName } },
+  )
+  return unwrapCustomerData(response) ?? []
+}
+
 /** 批次更新約訪時間 */
 export async function updateAptRecords(payload: AptBatchUpdateRequest) {
   const response = await http.post<ApiEnvelope<AptBatchUpdateResponse[]>>(

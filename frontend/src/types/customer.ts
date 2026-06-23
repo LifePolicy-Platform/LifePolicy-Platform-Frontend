@@ -15,6 +15,8 @@ export interface AptRecordListResponse {
   recTime: string | null  /** 實際約訪時間，未完成為 null */
   listLastphone: string    /** 撥出電話 */
   campServiceDt: string  /** 名單回收日，格式 yyyy-MM-dd */
+  /** 約訪結果：0=尚未完成，1=約訪成功，2=約訪失敗 */
+  recallResult?: number
 }
 
 export interface ApiResponse<T> {
@@ -32,8 +34,8 @@ export interface AptUpdateItem {
 
 export type ScheduleMode = 'TODAY' | 'WORKDAYS' | 'SPECIFIC'
 
-/** 前端安排方式（對應 ScheduleMode） */
-export type UpdateMode = 'today' | 'workdays' | 'specific'
+/** 前端安排方式（對應 ScheduleMode，不含 TODAY） */
+export type UpdateMode = 'workdays' | 'specific'
 
 export interface AptBatchUpdateRequest {
   mode: ScheduleMode
@@ -97,6 +99,8 @@ export interface CallAppointmentConfirmRequest {
   policyNo: string
   /** 1=約訪成功，2=約訪失敗 */
   recallResult: number
+  /** 實際約訪時間（選填，格式 yyyy-MM-dd HH:mm:ss） */
+  recTime?: string
 }
 
 export interface CallAppointmentConfirmResponse {
