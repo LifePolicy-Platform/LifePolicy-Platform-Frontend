@@ -59,7 +59,7 @@ watch(
 </script>
 
 <template>
-  <q-dialog v-model="isOpen" persistent>
+  <q-dialog v-model="isOpen">
     <q-card class="policy-appointment-dialog">
       <q-card-section>
         <div class="text-h6">新增約訪</div>
@@ -67,61 +67,18 @@ watch(
       </q-card-section>
 
       <q-card-section class="q-pt-none q-gutter-md">
-        <q-input
-          :model-value="context?.listNo ?? ''"
-          label="名單序號"
-          dense
-          outlined
-          readonly
-          bg-color="grey-2"
-        />
-        <q-input
-          :model-value="context?.custName ?? ''"
-          label="客戶名稱"
-          dense
-          outlined
-          readonly
-          bg-color="grey-2"
-        />
-        <q-input
-          :model-value="context?.listLastPhone ?? ''"
-          label="撥出電話"
-          dense
-          outlined
-          readonly
-          bg-color="grey-2"
-        />
-        <q-select
-          v-model="campCode"
-          :options="projectOptions"
-          label="專案名稱"
-          dense
-          outlined
-          emit-value
-          map-options
-          :loading="projectsLoading"
-          :disable="projectsLoading || projectOptions.length === 0"
-          hint="僅顯示服務期限內的專案"
-        />
-        <q-input
-          v-model="recallDateTime"
-          label="約訪日期時間"
-          type="datetime-local"
-          dense
-          outlined
-          stack-label
-        />
+        <q-input :model-value="context?.listNo ?? ''" label="名單序號" dense outlined readonly bg-color="grey-2" />
+        <q-input :model-value="context?.custName ?? ''" label="客戶名稱" dense outlined readonly bg-color="grey-2" />
+        <q-input :model-value="context?.listLastPhone ?? ''" label="撥出電話" dense outlined readonly bg-color="grey-2" />
+        <q-select v-model="campCode" :options="projectOptions" label="專案名稱" dense outlined emit-value map-options
+          :loading="projectsLoading" :disable="projectsLoading || projectOptions.length === 0" hint="僅顯示服務期限內的專案" />
+        <q-input v-model="recallDateTime" label="約訪日期時間" type="datetime-local" dense outlined stack-label />
       </q-card-section>
 
       <q-card-actions align="right">
         <q-btn v-close-popup flat label="取消" />
-        <q-btn
-          color="primary"
-          label="確認新增"
-          :loading="saving"
-          :disable="!campCode || !recallDateTime"
-          @click="handleSubmit"
-        />
+        <q-btn color="primary" label="確認新增" :loading="saving" :disable="!campCode || !recallDateTime"
+          @click="handleSubmit" />
       </q-card-actions>
     </q-card>
   </q-dialog>
