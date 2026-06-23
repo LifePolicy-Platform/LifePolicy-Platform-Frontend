@@ -19,6 +19,7 @@ import {
   fetchPolicyAppointmentContext,
 } from '@/api/customer'
 import PolicyHistoryTable from '@/components/policy/PolicyHistoryTable.vue'
+import PolicyDocumentPanel from '@/components/policy/PolicyDocumentPanel.vue'
 import PolicyAppointmentDialog from '@/components/policy/PolicyAppointmentDialog.vue'
 import PolicyAppointmentResultDialog from '@/components/policy/PolicyAppointmentResultDialog.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -410,7 +411,6 @@ onMounted(loadPolicy)
         <q-card flat bordered class="policy-content-card policy-content-card--wide">
           <q-card-section>
             <div class="policy-content-card__heading">
-              <q-icon name="description_outlined" color="primary" size="20px" />
               <span>保單與核保資訊</span>
             </div>
             <div class="policy-content-metrics">
@@ -448,6 +448,21 @@ onMounted(loadPolicy)
                 <dd class="text-negative">{{ record.REJECTION_REASON }}</dd>
               </div>
             </dl>
+          </q-card-section>
+        </q-card>
+
+        <q-card flat bordered class="policy-content-card policy-content-card--wide">
+          <q-card-section>
+            <div class="policy-content-card__heading">
+              <q-icon name="folder_open" color="primary" size="20px" />
+              <span>文件確認</span>
+            </div>
+            <PolicyDocumentPanel
+              :file01-name="record.PFILE_01_NAME"
+              :file01-path="record.PFILE_01_PATH"
+              :file02-name="record.PFILE_02_NAME"
+              :file02-path="record.PFILE_02_PATH"
+            />
           </q-card-section>
         </q-card>
 

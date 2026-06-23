@@ -18,6 +18,10 @@ export interface PolicyRecord {
   REJECTION_REASON?: string
   RISK_LEVEL?: string
   PREMIUM_RATIO?: number
+  PFILE_01_NAME?: string
+  PFILE_01_PATH?: string
+  PFILE_02_NAME?: string
+  PFILE_02_PATH?: string
 }
 
 export interface PolicyQueryResult {

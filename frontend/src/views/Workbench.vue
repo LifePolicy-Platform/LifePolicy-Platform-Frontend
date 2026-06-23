@@ -7,11 +7,13 @@ import type { ProductListItem1 } from '@/types/productMgmt'
 import type { PolicyRecord } from '@/types/policyApplication'
 import type { PolicyHistoryItem } from '@/types/policyMgmt'
 import PolicyHistoryTable from '@/components/policy/PolicyHistoryTable.vue'
+import PolicyDocumentPanel from '@/components/policy/PolicyDocumentPanel.vue'
 import {
   createPolicyApplication,
   queryPolicyApplications,
   updatePolicyApplication,
   reviewPolicyApplication,
+  uploadPolicyFile,
 } from '@/api/policyApplication'
 import { fetchPolicyAprvLogs } from '@/api/policyAprvLog'
 import { fetchActiveProducts } from '@/api/product'
@@ -185,7 +187,11 @@ function blankApplication() {
     productCode: '',
     sumInsured: '',
     annualPremium: '',
-    contactPhone: ''
+    contactPhone: '',
+    pfile01Name: '',
+    pfile01Path: '',
+    pfile02Name: '',
+    pfile02Path: '',
   }
 }
 
@@ -212,7 +218,10 @@ const reviewForm = reactive({
   rejectionReason: '',
   docIdentity: false,
   docProposal: false,
-  docHealth: false
+  pfile01Name: '',
+  pfile01Path: '',
+  pfile02Name: '',
+  pfile02Path: '',
 })
 
 const reviewTargetOptions = computed(() => {
@@ -246,6 +255,15 @@ const canPerformLoadedReview = computed(() => {
 const submitting = ref(false)
 const editLoaded = ref(false)
 const reviewLoaded = ref(false)
+
+const createFile01Input = ref<HTMLInputElement | null>(null)
+const createFile02Input = ref<HTMLInputElement | null>(null)
+const editFile01Input = ref<HTMLInputElement | null>(null)
+const editFile02Input = ref<HTMLInputElement | null>(null)
+const createUploading01 = ref(false)
+const createUploading02 = ref(false)
+const editUploading01 = ref(false)
+const editUploading02 = ref(false)
 
 // ---- 查詢結果 ----
 const queryResults = ref<PolicyRecord[]>([])
@@ -331,7 +349,7 @@ const documentHint = computed(() => {
   if (!canSupervisorReview.value) {
     return areDocumentsConfirmed() ? '文件檢核完成' : '主管審核時需完成文件檢核'
   }
-  return areDocumentsConfirmed() ? '文件檢核完成，可進入主管審核' : '主管審核前，請先完成三項文件勾選'
+  return areDocumentsConfirmed() ? '文件檢核完成，可進入主管審核' : '主管審核前，請先完成文件勾選'
 })
 
 // ---- 工具函式 ----
@@ -363,7 +381,7 @@ function evaluateRiskLevel(insuredBirthdate: string, relationship: string, sumIn
 }
 
 function areDocumentsConfirmed(): boolean {
-  return reviewForm.docIdentity && reviewForm.docProposal && reviewForm.docHealth
+  return reviewForm.docIdentity && reviewForm.docProposal
 }
 
 function toApiDateTime(value: string): string | null {
@@ -381,7 +399,10 @@ function riskColor(level: string): string {
 }
 
 // ---- 驗證 ----
-function validateApplication(form: ReturnType<typeof blankApplication>): string[] {
+function validateApplication(
+  form: ReturnType<typeof blankApplication>,
+  options?: { requireFiles?: boolean },
+): string[] {
   const errors: string[] = []
   const idPattern = /^[A-Z][0-9]{9}$/
   const phonePattern = /^09\d{8}$/
@@ -425,6 +446,11 @@ function validateApplication(form: ReturnType<typeof blankApplication>): string[
     }
   }
 
+  if (options?.requireFiles) {
+    if (!form.pfile01Path?.trim()) errors.push('請上傳身分證明')
+    if (!form.pfile02Path?.trim()) errors.push('請上傳要保書')
+  }
+
   return errors
 }
 
@@ -434,7 +460,7 @@ function buildPayload(form: ReturnType<typeof blankApplication>) {
   const premiumRatio = sumInsured > 0 ? annualPremium / sumInsured : 0
   const relationshipToInsured = resolveRelationship(form.applicantIdNo, form.insuredIdNo)
 
-  return {
+  const payload: Record<string, unknown> = {
     APPLICANT_ID_NO: form.applicantIdNo.trim(),
     APPLICANT_NAME: form.applicantName.trim(),
     APPLICANT_GENDER: form.applicantGender,
@@ -449,7 +475,77 @@ function buildPayload(form: ReturnType<typeof blankApplication>) {
     ANNUAL_PREMIUM: annualPremium,
     CONTACT_PHONE: form.contactPhone.trim(),
     RISK_LEVEL: evaluateRiskLevel(form.insuredBirthdate, relationshipToInsured, sumInsured, premiumRatio),
-    CREATED_BY: authStore.currentUser?.USERNAME ?? ''
+    CREATED_BY: authStore.currentUser?.USERNAME ?? '',
+  }
+
+  if (form.pfile01Path?.trim()) {
+    payload.PFILE_01_NAME = form.pfile01Name
+    payload.PFILE_01_PATH = form.pfile01Path
+  }
+  if (form.pfile02Path?.trim()) {
+    payload.PFILE_02_NAME = form.pfile02Name
+    payload.PFILE_02_PATH = form.pfile02Path
+  }
+
+  return payload
+}
+
+function triggerPolicyFileSelect(target: 'create' | 'edit', slot: 1 | 2) {
+  if (target === 'create') {
+    if (slot === 1) createFile01Input.value?.click()
+    else createFile02Input.value?.click()
+    return
+  }
+  if (slot === 1) editFile01Input.value?.click()
+  else editFile02Input.value?.click()
+}
+
+function onPolicyFileChange(event: Event, target: 'create' | 'edit', slot: 1 | 2) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (file) {
+    handlePolicyFileUpload(file, target, slot)
+  }
+  input.value = ''
+}
+
+async function handlePolicyFileUpload(file: File, target: 'create' | 'edit', slot: 1 | 2) {
+  const uploadingFlag =
+    target === 'create'
+      ? slot === 1
+        ? createUploading01
+        : createUploading02
+      : slot === 1
+        ? editUploading01
+        : editUploading02
+
+  uploadingFlag.value = true
+  try {
+    const data = await uploadPolicyFile(file)
+    const form = target === 'create' ? createForm : editForm
+    if (slot === 1) {
+      form.pfile01Name = data.fileName
+      form.pfile01Path = data.filePath
+    } else {
+      form.pfile02Name = data.fileName
+      form.pfile02Path = data.filePath
+    }
+    notifySuccess('檔案上傳成功')
+  } catch {
+    notifyError('檔案上傳失敗，請稍後再試')
+  } finally {
+    uploadingFlag.value = false
+  }
+}
+
+function clearPolicyFile(target: 'create' | 'edit', slot: 1 | 2) {
+  const form = target === 'create' ? createForm : editForm
+  if (slot === 1) {
+    form.pfile01Name = ''
+    form.pfile01Path = ''
+  } else {
+    form.pfile02Name = ''
+    form.pfile02Path = ''
   }
 }
 
@@ -560,7 +656,11 @@ function loadRecordToEdit(record: PolicyRecord) {
     productCode: record.PRODUCT_CODE || '',
     sumInsured: String(record.SUM_INSURED || ''),
     annualPremium: String(record.ANNUAL_PREMIUM || ''),
-    contactPhone: record.CONTACT_PHONE || ''
+    contactPhone: record.CONTACT_PHONE || '',
+    pfile01Name: record.PFILE_01_NAME || '',
+    pfile01Path: record.PFILE_01_PATH || '',
+    pfile02Name: record.PFILE_02_NAME || '',
+    pfile02Path: record.PFILE_02_PATH || '',
   })
   editLoaded.value = true
   activeTab.value = 'edit'
@@ -584,7 +684,10 @@ function loadRecordToReview(record: PolicyRecord) {
   reviewForm.rejectionReason = record.REJECTION_REASON || ''
   reviewForm.docIdentity = false
   reviewForm.docProposal = false
-  reviewForm.docHealth = false
+  reviewForm.pfile01Name = record.PFILE_01_NAME || ''
+  reviewForm.pfile01Path = record.PFILE_01_PATH || ''
+  reviewForm.pfile02Name = record.PFILE_02_NAME || ''
+  reviewForm.pfile02Path = record.PFILE_02_PATH || ''
   reviewLoaded.value = true
   activeTab.value = 'review'
   notifySuccess(`已載入案件 ${record.APPLICATION_ID} 到審核區`)
@@ -601,12 +704,17 @@ function canReviewRow(record: PolicyRecord): boolean {
 }
 
 // ---- 修改 ----
+function resetEditForm() {
+  Object.assign(editForm, blankApplication())
+  editLoaded.value = false
+}
+
 async function handleEdit() {
   if (!editLoaded.value) {
     notifyError('請先從查詢結果載入要修改的案件')
     return
   }
-  const errors = validateApplication(editForm)
+  const errors = validateApplication(editForm, { requireFiles: true })
   if (errors.length) {
     notifyError(errors[0])
     return
@@ -614,6 +722,12 @@ async function handleEdit() {
   submitting.value = true
   try {
     const result = await updatePolicyApplication(editForm.applicationId, buildPayload(editForm))
+    resetEditForm()
+    activeTab.value = 'query'
+    await nextTick()
+    if (hasQueried.value) {
+      await handleQuery({ silent: true })
+    }
     notifySuccess(`修改成功，已重新送審（SUBMIT），風險等級 ${result.RISK_LEVEL}`)
   } catch (error: any) {
     notifyError(error.response?.data?.MESSAGE || '修改失敗')
@@ -630,7 +744,10 @@ function resetReviewForm() {
   reviewForm.rejectionReason = ''
   reviewForm.docIdentity = false
   reviewForm.docProposal = false
-  reviewForm.docHealth = false
+  reviewForm.pfile01Name = ''
+  reviewForm.pfile01Path = ''
+  reviewForm.pfile02Name = ''
+  reviewForm.pfile02Path = ''
   reviewLoaded.value = false
 }
 
@@ -648,7 +765,7 @@ async function handleReview() {
     return
   }
   if (showDocumentCheck.value && !areDocumentsConfirmed()) {
-    notifyError('主管審核前，請先完成三項文件勾選')
+    notifyError('主管審核前，請先完成身分證明與要保書勾選')
     return
   }
   submitting.value = true
@@ -828,6 +945,79 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                     @update:model-value="createForm.annualPremium = parseCurrencyInput($event)"
                   />
                 </div>
+
+                <div class="full-span q-mt-sm">
+                  <div class="text-subtitle2 text-weight-bold text-grey-8 q-mb-xs">
+                    上傳保單文件 <span class="text-grey-6 text-caption">（選填）</span>
+                  </div>
+                  <div class="row q-col-gutter-sm">
+                    <div class="col-12 col-md-6">
+                      <q-btn
+                        class="full-width"
+                        color="grey-7"
+                        outline
+                        icon="attach_file"
+                        :label="createUploading01 ? '上傳中...' : '上傳檔案'"
+                        :loading="createUploading01"
+                        no-caps
+                        @click="triggerPolicyFileSelect('create', 1)"
+                      />
+                      <input
+                        ref="createFile01Input"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        style="display: none"
+                        @change="onPolicyFileChange($event, 'create', 1)"
+                      />
+                      <div v-if="createForm.pfile01Path" class="row items-center no-wrap q-mt-xs q-gutter-xs">
+                        <span class="text-caption text-positive col">已上傳：{{ createForm.pfile01Name }}</span>
+                        <q-btn
+                          flat
+                          dense
+                          round
+                          color="negative"
+                          icon="close"
+                          size="sm"
+                          aria-label="移除檔案"
+                          @click="clearPolicyFile('create', 1)"
+                        />
+                      </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <q-btn
+                        class="full-width"
+                        color="grey-7"
+                        outline
+                        icon="attach_file"
+                        :label="createUploading02 ? '上傳中...' : '上傳檔案'"
+                        :loading="createUploading02"
+                        no-caps
+                        @click="triggerPolicyFileSelect('create', 2)"
+                      />
+                      <input
+                        ref="createFile02Input"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        style="display: none"
+                        @change="onPolicyFileChange($event, 'create', 2)"
+                      />
+                      <div v-if="createForm.pfile02Path" class="row items-center no-wrap q-mt-xs q-gutter-xs">
+                        <span class="text-caption text-positive col">已上傳：{{ createForm.pfile02Name }}</span>
+                        <q-btn
+                          flat
+                          dense
+                          round
+                          color="negative"
+                          icon="close"
+                          size="sm"
+                          aria-label="移除檔案"
+                          @click="clearPolicyFile('create', 2)"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div class="q-mt-md">
                   <q-btn color="primary" unelevated label="送出新增" no-caps :loading="submitting" @click="handleCreate" />
                 </div>
@@ -1059,8 +1249,86 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   />
                   <q-input v-model="editForm.contactPhone" label="聯絡電話" outlined dense maxlength="10" />
                 </div>
+
+                <div class="full-span q-mt-sm">
+                  <div class="text-subtitle2 text-weight-bold text-grey-8 q-mb-xs">上傳保單文件（必填）</div>
+                  <div class="row q-col-gutter-sm">
+                    <div class="col-12 col-md-6">
+                      <q-btn
+                        class="full-width"
+                        color="grey-7"
+                        outline
+                        icon="attach_file"
+                        :label="editUploading01 ? '上傳中...' : '上傳檔案 *'"
+                        :loading="editUploading01"
+                        no-caps
+                        @click="triggerPolicyFileSelect('edit', 1)"
+                      />
+                      <input
+                        ref="editFile01Input"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        style="display: none"
+                        @change="onPolicyFileChange($event, 'edit', 1)"
+                      />
+                      <div v-if="editForm.pfile01Path" class="row items-center no-wrap q-mt-xs q-gutter-xs">
+                        <span class="text-caption text-positive col">已上傳：{{ editForm.pfile01Name }}</span>
+                        <q-btn
+                          flat
+                          dense
+                          round
+                          color="negative"
+                          icon="close"
+                          size="sm"
+                          aria-label="移除檔案"
+                          @click="clearPolicyFile('edit', 1)"
+                        />
+                      </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <q-btn
+                        class="full-width"
+                        color="grey-7"
+                        outline
+                        icon="attach_file"
+                        :label="editUploading02 ? '上傳中...' : '上傳檔案 *'"
+                        :loading="editUploading02"
+                        no-caps
+                        @click="triggerPolicyFileSelect('edit', 2)"
+                      />
+                      <input
+                        ref="editFile02Input"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        style="display: none"
+                        @change="onPolicyFileChange($event, 'edit', 2)"
+                      />
+                      <div v-if="editForm.pfile02Path" class="row items-center no-wrap q-mt-xs q-gutter-xs">
+                        <span class="text-caption text-positive col">已上傳：{{ editForm.pfile02Name }}</span>
+                        <q-btn
+                          flat
+                          dense
+                          round
+                          color="negative"
+                          icon="close"
+                          size="sm"
+                          aria-label="移除檔案"
+                          @click="clearPolicyFile('edit', 2)"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <PolicyDocumentPanel
+                    class="q-mt-sm"
+                    :file01-name="editForm.pfile01Name"
+                    :file01-path="editForm.pfile01Path"
+                    :file02-name="editForm.pfile02Name"
+                    :file02-path="editForm.pfile02Path"
+                  />
+                </div>
+
                 <div class="q-mt-md">
-                  <q-btn color="primary" unelevated label="送出修改" no-caps icon="save" :loading="submitting" @click="handleEdit" />
+                  <q-btn color="primary" unelevated label="送出修改" no-caps :loading="submitting" @click="handleEdit" />
                 </div>
               </template>
               </q-card-section>
@@ -1092,6 +1360,17 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                 <q-banner rounded class="bg-blue-1 text-blue-9 q-mt-md">
                   目前狀態：{{ applicationStatusLabel(reviewForm.sourceStatus) }}
                 </q-banner>
+
+                <q-card flat bordered class="q-mt-md q-pa-md">
+                  <div class="text-weight-bold text-grey-8 q-mb-sm">保單文件確認</div>
+                  <PolicyDocumentPanel
+                    :file01-name="reviewForm.pfile01Name"
+                    :file01-path="reviewForm.pfile01Path"
+                    :file02-name="reviewForm.pfile02Name"
+                    :file02-path="reviewForm.pfile02Path"
+                  />
+                </q-card>
+
                 <div class="form-grid q-mt-md">
                   <q-input v-model="reviewForm.applicationId" label="保單編號" outlined dense readonly />
                   <div class="identity-tile">
@@ -1115,7 +1394,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                     outlined
                     type="textarea"
                     rows="3"
-                    :hint="reviewForm.targetStatus === 'RETURN' ? '業務退件時請填寫原因' : '主管駁回時請填寫原因'"
+                    :hint="reviewForm.targetStatus === 'RETURN' ? '業務退件時請填寫原因 *' : '主管駁回時請填寫原因 *'"
                   />
                 </div>
 
@@ -1123,7 +1402,6 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   <div class="text-weight-bold q-mb-sm text-primary">文件完整性檢核（主管審核）</div>
                   <q-checkbox v-model="reviewForm.docIdentity" label="身分證明" />
                   <q-checkbox v-model="reviewForm.docProposal" label="要保書" />
-                  <q-checkbox v-model="reviewForm.docHealth" label="健康告知" />
                 </q-card>
 
                 <div class="q-mt-md">
@@ -1143,7 +1421,6 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
               <div class="hint-row"><span class="hint-label">保費比例</span><span>{{ premiumRatioHint }}</span></div>
               <div class="hint-row"><span class="hint-label">核保風險等級</span><span>{{ riskLevelHint }}</span></div>
               <div class="hint-row"><span class="hint-label">重複投保預警</span><span>{{ duplicateWarning }}</span></div>
-              <div class="hint-row hint-row--last"><span class="hint-label">文件檢核</span><span>{{ documentHint }}</span></div>
             </q-card-section>
           </q-card>
 
