@@ -1,41 +1,57 @@
 <template>
-  <div class="q-pa-md bg-grey-1">
-    <div class="row items-center justify-between q-mb-md">
-      <div class="text-h5 text-weight-bold text-primary">理賠審核</div>
-    </div>
+  <section class="page-with-hero">
+    <PageHero title="理賠審核" subtitle="審核理賠案件與檢視審核歷程" />
 
-    <q-card class="q-mb-md flat bordered">
-      <q-card-section class="row q-col-gutter-sm items-center">
-        <div class="col-12 col-sm-4">
-          <q-select 
-            v-model="filters.status" 
-            :options="statusOptions" 
-            emit-value 
-            map-options 
-            label="審核狀態篩選" 
-            outlined 
-            dense 
-            clearable 
-            @update:model-value="loadAuditData"
-          />
-        </div>
-        <div class="col-12 col-sm-4">
-          <q-input 
-            v-model="filters.policyNo" 
-            label="保單號碼搜尋" 
-            outlined 
-            dense 
-            clearable 
-            @keydown.enter="loadAuditData"
-          />
-        </div>
-        <div class="col-12 col-sm-4">
-          <q-btn color="indigo-7" icon="search" label="查詢審核列表" @click="loadAuditData" />
-        </div>
-      </q-card-section>
-    </q-card>
+    <div class="page-body">
+      <q-card flat class="page-card page-card--filter q-mb-md">
+        <q-card-section>
+          <div class="page-card__header q-mb-sm">
+            <div>
+              <p class="page-card__kicker">CLAIM AUDIT</p>
+              <div class="page-card__title">查詢條件</div>
+            </div>
+          </div>
+          <div class="row q-col-gutter-sm items-end q-mt-sm">
+            <div class="col-12 col-sm-4">
+              <q-select
+                v-model="filters.status"
+                :options="statusOptions"
+                emit-value
+                map-options
+                label="審核狀態篩選"
+                outlined
+                dense
+                clearable
+                @update:model-value="loadAuditData"
+              />
+            </div>
+            <div class="col-12 col-sm-4">
+              <q-input
+                v-model="filters.policyNo"
+                label="保單號碼搜尋"
+                outlined
+                dense
+                clearable
+                @keydown.enter="loadAuditData"
+              />
+            </div>
+          </div>
+          <div class="q-mt-md row items-center wrap q-gutter-sm">
+            <q-btn color="primary" unelevated icon="search" label="查詢審核列表" no-caps :loading="loading" @click="loadAuditData" />
+          </div>
+        </q-card-section>
+      </q-card>
 
-    <q-table :rows="rows" :columns="columns" row-key="claimNo" :loading="loading" flat bordered class="bg-white">
+      <q-card flat class="page-card page-card--data">
+        <q-card-section>
+          <div class="page-card__header q-mb-md">
+            <div>
+              <p class="page-card__kicker">AUDIT LIST</p>
+              <div class="page-card__title">待審／已審清單</div>
+            </div>
+          </div>
+
+          <q-table :rows="rows" :columns="columns" row-key="claimNo" :loading="loading" flat bordered class="app-table">
       <template v-slot:body-cell-claimStatus="props">
         <q-td :props="props">
           <q-badge :color="getStatusColor(props.value)" class="q-pa-xs">
@@ -64,20 +80,11 @@
           />
         </q-td>
       </template>
-    </q-table>
+          </q-table>
+        </q-card-section>
+      </q-card>
+    </div>
 
-    <!-- <q-dialog v-model="auditDialog.show" persistent max-width="90vw" style="width: 1000px;">
-      <q-card class="row no-wrap" style="max-height: 85vh;">
-        
-        <q-btn 
-          icon="close" 
-          flat 
-          round 
-          dense 
-          v-close-popup 
-          class="absolute-top-right q-ma-sm text-grey-6" 
-          style="z-index: 10;"
-        /> -->
         <q-dialog v-model="auditDialog.show" persistent>
   <q-card style="width: 900px; max-width: 95vw;">
     <!-- 關閉按鈕 -->
@@ -220,7 +227,7 @@
 
       </q-card>
     </q-dialog>
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
@@ -228,6 +235,7 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { useQuasar } from 'quasar'
 import axios from 'axios'
 import type { QTableColumn } from 'quasar'
+import PageHero from '@/components/layout/PageHero.vue'
 const $q = useQuasar()
 const loading = ref(false)
 const rows = ref([])
@@ -392,7 +400,7 @@ function viewPdf(path: string | undefined) {
 
   // 2. 如果路徑是 /uploads/...，直接加上後端 Base URL
   // 請確認 import.meta.env.VITE_API_BASE_URL 有值
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8085';
   
   // 組合網址：確保中間只有一個斜線
   const cleanBase = baseUrl.replace(/\/$/, '');

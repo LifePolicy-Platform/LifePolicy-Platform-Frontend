@@ -1,10 +1,10 @@
 import { http } from '@/api/http'
+import type { ApiEnvelope } from '@/types/auth'
 import type {
   AptRecordListResponse,
   AptRecordListRequest,
   AptBatchUpdateRequest,
   AptBatchUpdateResponse,
-  ApiResponse,
   PolicyAppointmentContext,
   ActiveProjectOption,
   CallAppointmentItem,
@@ -14,9 +14,13 @@ import type {
   CallAppointmentConfirmResponse,
 } from '@/types/customer'
 
+function unwrapCustomerData<T>(response: { data: ApiEnvelope<T> }): T {
+  return response.data.DATA
+}
+
 /** 查詢約訪名單 */
 export async function fetchAptRecords(params: AptRecordListRequest) {
-  const response = await http.get<ApiResponse<AptRecordListResponse[]>>(
+  const response = await http.get<ApiEnvelope<AptRecordListResponse[]>>(
     '/api/apt-records',
     { params },
   )
@@ -25,7 +29,7 @@ export async function fetchAptRecords(params: AptRecordListRequest) {
 
 /** 批次更新約訪時間 */
 export async function updateAptRecords(payload: AptBatchUpdateRequest) {
-  const response = await http.post<ApiResponse<AptBatchUpdateResponse[]>>(
+  const response = await http.post<ApiEnvelope<AptBatchUpdateResponse[]>>(
     '/api/customer/updateAppoint',
     payload,
   )
@@ -43,7 +47,7 @@ export async function fetchPolicyAppointmentContext(policyNo: string) {
 
 /** 取得有效專案選項 */
 export async function fetchActiveProjects() {
-  const response = await http.get<ApiResponse<ActiveProjectOption[]>>(
+  const response = await http.get<ApiEnvelope<ActiveProjectOption[]>>(
     '/api/apt-records/active-projects',
   )
   return response.data.DATA ?? []
@@ -59,7 +63,7 @@ export async function fetchAppointmentsByListNo(listNo: string) {
 
 /** 新增約訪 */
 export async function createCallAppointment(payload: CallAppointmentCreateRequest) {
-  const response = await http.post<ApiResponse<CallAppointmentCreateResponse>>(
+  const response = await http.post<ApiEnvelope<CallAppointmentCreateResponse>>(
     '/api/customer/createAppoint',
     payload,
   )
@@ -68,7 +72,7 @@ export async function createCallAppointment(payload: CallAppointmentCreateReques
 
 /** 確認約訪結果 */
 export async function confirmCallAppointmentResult(payload: CallAppointmentConfirmRequest) {
-  const response = await http.post<ApiResponse<CallAppointmentConfirmResponse>>(
+  const response = await http.post<ApiEnvelope<CallAppointmentConfirmResponse>>(
     '/api/customer/confirmAppointResult',
     payload,
   )

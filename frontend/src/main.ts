@@ -35,7 +35,7 @@ app.use(Quasar, {
   },
   components: {
     QBanner, QBtn, QCard, QCardSection, QCheckbox, QChip, QDate, QDialog, QIcon, QImg, QInput,
-    QItem, QItemLabel, QItemSection, QList, QPopupProxy, QRadio,
+    QItem, QItemLabel, QItemSection, QList, QOptionGroup, QPopupProxy, QRadio,
     QSelect, QSeparator, QTab, QTable, QPagination, QTabPanel, QTabPanels, QTabs, QTd, QTime, QTr,
     QPage, QSpace, QCardActions,QBadge,QInnerLoading,QAvatar
   },

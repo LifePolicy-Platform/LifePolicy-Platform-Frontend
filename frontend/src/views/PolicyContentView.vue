@@ -28,6 +28,7 @@ import {
 } from '@/constants/applicationStatus'
 import {
   canCreateAppointment,
+  normalizeListStatus,
 } from '@/constants/callListStatus'
 import { recallResultLabel, recallResultColor } from '@/constants/recallResult'
 
@@ -54,19 +55,38 @@ const policyNo = computed(() => String(route.params.policyNo ?? ''))
 
 const currentUsername = computed(() => authStore.currentUser?.USERNAME ?? '')
 
+const normalizedListStatus = computed(() =>
+  normalizeListStatus(appointmentContext.value?.listStatus),
+)
+
 const showConfirmResultButton = computed(() => {
   const ctx = appointmentContext.value
-  if (!ctx || ctx.listStatus !== 1) return false
+  if (!ctx || normalizedListStatus.value !== 1) return false
   return Boolean(
     ctx.pendingAppointmentUser &&
     ctx.pendingAppointmentUser === currentUsername.value,
   )
 })
 
+const canShowAddAppointmentButton = computed(() => {
+  const ctx = appointmentContext.value
+  if (!ctx?.listNo) return false
+  return canCreateAppointment(normalizedListStatus.value)
+})
+
 const appointmentDisableReason = computed(() => {
-  if (!appointmentContext.value?.listNo) return '此保單尚無對應名單'
+  const ctx = appointmentContext.value
+  if (!ctx?.listNo) return '查無名單資料，無法約訪'
+  if (normalizedListStatus.value === 1 && !showConfirmResultButton.value) {
+    return '此名單尚有未完成約訪，無法新增約訪'
+  }
+  if (!canCreateAppointment(normalizedListStatus.value)) {
+    return '目前名單狀態無法新增約訪'
+  }
   return ''
 })
+
+
 
 const appointmentColumns = [
   { name: 'recNo', label: '約訪序號', field: 'recNo', align: 'left' as const },
@@ -143,7 +163,11 @@ async function loadAppointmentContext() {
     const context = await fetchPolicyAppointmentContext(policyNo.value)
     appointmentContext.value = context
     if (context?.listNo) {
-      appointmentRows.value = await fetchAppointmentsByListNo(context.listNo)
+      try {
+        appointmentRows.value = await fetchAppointmentsByListNo(context.listNo)
+      } catch {
+        appointmentRows.value = []
+      }
     }
   } catch {
     appointmentContext.value = null
@@ -155,9 +179,13 @@ async function loadAppointmentContext() {
 
 async function openAppointmentDialog() {
   const ctx = appointmentContext.value
-  if (!ctx?.listNo) return
+  if (!ctx?.listNo) {
+    $q.notify({ type: 'warning', message: '查無名單資料，無法新增約訪', position: 'top' })
+    return
+  }
 
-  if (ctx.listStatus === 1) {
+  const listStatus = normalizeListStatus(ctx.listStatus)
+  if (listStatus === 1) {
     $q.dialog({
       title: '無法新增約訪',
       message: '此名單尚有未完成約訪，無法新增約訪',
@@ -166,7 +194,10 @@ async function openAppointmentDialog() {
     return
   }
 
-  if (!canCreateAppointment(ctx.listStatus)) return
+  if (!canCreateAppointment(listStatus)) {
+    $q.notify({ type: 'warning', message: '目前名單狀態無法新增約訪', position: 'top' })
+    return
+  }
 
   appointmentDialogOpen.value = true
   projectsLoading.value = true
@@ -285,7 +316,7 @@ onMounted(loadPolicy)
       />
       <div>
         <h1 class="policy-content-page__title">保單內容</h1>
-        <p class="policy-content-page__subtitle">檢視投保申請完整資料與審核歷程</p>
+        <p class="policy-content-page__subtitle">檢視投保案件完整資料與審核歷程</p>
       </div>
     </div>
 
@@ -345,11 +376,7 @@ onMounted(loadPolicy)
               </div>
               <div class="policy-content-dl__row">
                 <dt>聯絡電話</dt>
-                <dd>{{ displayValue(record.CONTACT_PHONE) }}</dd>
-              </div>
-              <div class="policy-content-dl__row">
-                <dt>與被保人關係</dt>
-                <dd>{{ displayValue(record.RELATIONSHIP_TO_INSURED) }}</dd>
+                <dd>{{ displayValue(record.CONTACT_PHONE || appointmentContext?.listLastPhone) }}</dd>
               </div>
             </dl>
           </q-card-section>
@@ -449,7 +476,7 @@ onMounted(loadPolicy)
                 dense
                 icon="add"
                 label="新增約訪"
-                :disable="!appointmentContext?.listNo"
+                :disable="!canShowAddAppointmentButton"
                 @click="handleAppointmentAction"
               >
                 <q-tooltip v-if="appointmentDisableReason">
