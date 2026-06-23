@@ -117,7 +117,7 @@ watch(historyRows, () => {
                       <div class="page-card__title">查詢條件</div>
                       <p class="page-card__desc">尚未完成訪的名單，可依約訪日期區間篩選</p>
                     </div>
-                    
+
                   </div>
 
                   <div class="upd-time-filter-row q-mt-sm">
@@ -129,8 +129,8 @@ watch(historyRows, () => {
                       <q-input v-model="searchEndTime" label="結束時間" type="time" stack-label outlined dense />
                     </div>
                     <div class="upd-time-filter-actions row items-center no-wrap q-gutter-sm">
-                      <q-btn color="primary" unelevated label="執行查詢" no-caps icon="search" size="m"
-                        :loading="isLoading" @click="searchAppointments" />
+                      <q-btn color="primary" unelevated label="執行查詢" no-caps icon="search" size="m" :loading="isLoading"
+                        @click="searchAppointments" />
                       <q-btn outline color="primary" label="清空條件" no-caps icon="refresh" size="m"
                         @click="resetSearchFilters" />
                     </div>
@@ -154,17 +154,9 @@ watch(historyRows, () => {
                     {{ errorMsg }}
                   </q-banner>
 
-                  <q-table
-                    class="app-table upd-time-reschedule-table"
-                    v-model:pagination="historyPagination"
-                    flat
-                    bordered
-                    :rows="rows"
-                    :columns="rescheduleColumns"
-                    row-key="sno"
-                    :loading="isLoading"
-                    :rows-per-page-options="[10]"
-                  >
+                  <q-table class="app-table upd-time-reschedule-table" v-model:pagination="historyPagination" flat
+                    bordered :rows="rows" :columns="rescheduleColumns" row-key="sno" :loading="isLoading"
+                    :rows-per-page-options="[10]">
                     <template #no-data>
                       <div class="upd-time-table-empty text-grey-6">
                         {{ hasSearched ? '查無資料，請調整查詢條件' : '請輸入條件後執行查詢' }}
@@ -174,12 +166,8 @@ watch(historyRows, () => {
                     <template #header-cell-select="props">
                       <q-th :props="props" style="width: 48px; min-width: 48px; padding: 0 4px;">
                         <div style="display: flex; align-items: center; justify-content: center;">
-                          <q-checkbox
-                            :model-value="allSelected"
-                            :indeterminate="hasPartialSelection"
-                            dense
-                            @update:model-value="allSelected = $event"
-                          />
+                          <q-checkbox :model-value="allSelected" :indeterminate="hasPartialSelection" dense
+                            @update:model-value="allSelected = $event" />
                         </div>
                       </q-th>
                     </template>
@@ -276,8 +264,8 @@ watch(historyRows, () => {
                   </q-banner>
 
                   <div class="q-mt-lg row justify-end">
-                    <q-btn color="primary" unelevated label="儲存變更" no-caps icon="save" :loading="isSaving"
-                      :disable="isSaving" @click="saveUpdate" />
+                    <q-btn color="primary" unelevated label="儲存變更" no-caps :loading="isSaving" :disable="isSaving"
+                      @click="saveUpdate" />
                   </div>
                 </q-card-section>
               </q-card>
@@ -299,16 +287,8 @@ watch(historyRows, () => {
 
                   <div class="upd-time-filter-row q-mt-sm">
                     <div class="upd-time-history-filter">
-                      <q-input
-                        v-model="historyCustName"
-                        label="客戶姓名"
-                        outlined
-                        dense
-                        clearable
-                        :error="!!historyNameError"
-                        :error-message="historyNameError"
-                        @keyup.enter="searchHistory"
-                      />
+                      <q-input v-model="historyCustName" label="客戶姓名" outlined dense clearable
+                        :error="!!historyNameError" :error-message="historyNameError" @keyup.enter="searchHistory" />
                     </div>
                     <div class="upd-time-filter-actions row items-center no-wrap q-gutter-sm">
                       <q-btn color="primary" unelevated label="執行查詢" no-caps icon="search" size="m"
@@ -334,17 +314,8 @@ watch(historyRows, () => {
                     {{ historyErrorMsg }}
                   </q-banner>
 
-                  <q-table
-                    v-model:pagination="historyPagination"
-                    class="app-table"
-                    flat
-                    bordered
-                    :rows="historyRows"
-                    :columns="historyColumns"
-                    row-key="sno"
-                    :loading="isHistoryLoading"
-                    :rows-per-page-options="[10]"
-                  >
+                  <q-table v-model:pagination="historyPagination" class="app-table" flat bordered :rows="historyRows"
+                    :columns="historyColumns" row-key="sno" :loading="isHistoryLoading" :rows-per-page-options="[10]">
                     <template #no-data>
                       <div class="upd-time-table-empty text-grey-6">
                         {{ historyHasSearched ? '查無資料，請調整查詢條件' : '請輸入客戶姓名後執行查詢' }}
@@ -365,13 +336,8 @@ watch(historyRows, () => {
 
                     <template #body-cell-recallResult="props">
                       <q-td :props="props">
-                        <q-chip
-                          v-if="props.row.recallResult != null"
-                          dense
-                          size="sm"
-                          :color="recallResultColor(props.row.recallResult)"
-                          text-color="white"
-                        >
+                        <q-chip v-if="props.row.recallResult != null" dense size="sm"
+                          :color="recallResultColor(props.row.recallResult)" text-color="white">
                           {{ recallResultLabel(props.row.recallResult) }}
                         </q-chip>
                         <span v-else class="text-grey-6">—</span>
