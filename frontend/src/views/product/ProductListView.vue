@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useQuasar } from 'quasar'
+import { useAuthStore } from '@/stores/auth'
 import PageHero from '@/components/layout/PageHero.vue'
 import { useProductList } from '@/composables/useProductList'
 import {
@@ -18,6 +19,8 @@ import {
 } from '@/api/product'
 
 const $q = useQuasar()
+const authStore = useAuthStore()
+const isAdmin = computed(() => authStore.roles.includes('ADMIN'))
 const { filter, list, isLoading, errorMessage, reload, resetFilter } = useProductList()
 
 onMounted(() => reload())
@@ -366,6 +369,7 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
                 </q-chip>
               </div>
               <q-btn
+                v-if="isAdmin"
                 color="primary"
                 unelevated
                 icon="add"
@@ -488,6 +492,7 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
                 <q-icon name="inventory_2" size="40px" color="grey-5" />
                 <p>查無符合條件的商品</p>
                 <q-btn
+                  v-if="isAdmin"
                   outline
                   color="primary"
                   label="新增第一筆商品"

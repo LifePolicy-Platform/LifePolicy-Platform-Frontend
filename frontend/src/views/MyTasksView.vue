@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import PageHero from '@/components/layout/PageHero.vue'
+import { useAuthStore } from '@/stores/auth'
 import { useMyTasks } from '@/composables/useMyTasks'
 
 const {
@@ -18,6 +19,7 @@ const {
 } = useMyTasks()
 
 const router = useRouter()
+const authStore = useAuthStore()
 
 onMounted(() => search())
 
@@ -25,12 +27,31 @@ function goToQuery(policyNo: string) {
   router.push({ path: '/policy-mgmt', query: { tab: 'query', policyNo } })
 }
 
-const statusOptions = [
-  { label: '全部', value: '' },
-  { label: '待業務審核', value: 'SUBMIT' },
-  { label: '已退回',     value: 'RETURN' },
-  { label: '待主管審核', value: 'PENDING' },
-]
+const isReviewer = computed(() => authStore.roles.includes('REVIEWER'))
+
+// 依角色決定可選狀態
+const statusOptions = computed(() => {
+  if (isReviewer.value) {
+    return [
+      { label: '全部', value: '' },
+      { label: '待主管審核', value: 'PENDING' },
+    ]
+  }
+  return [
+    { label: '全部', value: '' },
+    { label: '待業務審核', value: 'SUBMIT' },
+    { label: '已退回',     value: 'RETURN' },
+  ]
+})
+
+// 依角色過濾清單（APPLICANT 不看 PENDING，REVIEWER 只看 PENDING）
+const APPLICANT_STATUSES = ['SUBMIT', 'RETURN']
+const REVIEWER_STATUSES  = ['PENDING']
+
+const roleFilteredTasks = computed(() => {
+  const allowed = isReviewer.value ? REVIEWER_STATUSES : APPLICANT_STATUSES
+  return filteredTasks.value.filter(t => allowed.includes(t.APPLICATION_STATUS))
+})
 
 const columns = [
   { name: 'APPLICATION_ID', label: '保單號碼', field: 'APPLICATION_ID', align: 'left' as const },
@@ -101,12 +122,12 @@ const columns = [
             <div>
               <p class="page-card__kicker">TASK LIST</p>
               <div class="page-card__title">待辦清單</div>
-              <p class="page-card__desc">共 {{ filteredTasks.length }} 筆結果</p>
+              <p class="page-card__desc">共 {{ roleFilteredTasks.length }} 筆結果</p>
             </div>
           </div>
           <q-table
             class="app-table"
-            :rows="filteredTasks"
+            :rows="roleFilteredTasks"
             :columns="columns"
             row-key="APPLICATION_ID"
             flat bordered dense

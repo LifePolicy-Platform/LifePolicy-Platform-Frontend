@@ -17,7 +17,6 @@ const {
   markAllAsRead,
 } = useNotifications()
 
-// 從已載入的通知計算未讀數，讓開啟 dropdown 後 badge 立即更新
 const displayCount = computed(() =>
   open.value
     ? notifications.value.filter(n => n.isRead === 0).length
@@ -44,10 +43,12 @@ function handleDocumentClick(e: MouseEvent) {
 onMounted(() => document.addEventListener('click', handleDocumentClick))
 onUnmounted(() => document.removeEventListener('click', handleDocumentClick))
 
-async function handleClick(notifNo: number, refNo: string | null) {
+async function handleClick(notifNo: number, refNo: string | null, notifType: string) {
   await markAsRead(notifNo)
-  if (refNo) {
-    close()
+  close()
+  if (notifType === 'CLAIM') {
+    router.push({ path: '/claim/ClaimAuditManager', query: refNo ? { claimNo: refNo } : {} })
+  } else if (refNo) {
     router.push({ path: '/policy-mgmt', query: { tab: 'query', policyNo: refNo } })
   }
 }
@@ -92,7 +93,7 @@ function formatTime(dateStr: string | null) {
           :key="n.notifNo"
           class="notif-item"
           :class="{ 'notif-item--unread': n.isRead === 0 }"
-          @click="handleClick(n.notifNo, n.refNo)"
+          @click="handleClick(n.notifNo, n.refNo, n.notifType)"
         >
           <div class="notif-item__title">{{ n.title }}</div>
           <div class="notif-item__content">{{ n.content }}</div>
