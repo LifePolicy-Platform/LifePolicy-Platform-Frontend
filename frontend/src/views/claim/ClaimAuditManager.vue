@@ -520,7 +520,7 @@ function viewPdf(path: string | undefined) {
   
   // 1. 效期比對
   if (applyDate < effectDate || applyDate > expireDate) {
-    return { pass: false, msg: `❌ 事故日期 (${form.applyTime.substring(0,10)}) 不在保單效期內 (${form.effectDate} ~ ${form.expireDate})` };
+    return { pass: false, msg: `❌ 事故日期 (${form.applyTime.substring(0,10)}) 不在保單效期內 ` };
   }
   
   // 2. 疾病等待期 (90天)
