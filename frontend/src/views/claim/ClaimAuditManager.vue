@@ -47,7 +47,7 @@
       <template v-slot:body-cell-actions="props">
         <q-td :props="props" class="q-gutter-xs">
           <q-btn 
-            v-if="['APPROVED', 'REJECTED'].includes(props.row.claimStatus)"
+            v-if="['APPROVED', 'REJECTED', 'RETURN', 'PENDING'].includes(props.row.claimStatus)"
             size="sm" 
             color="teal-7" 
             icon="visibility" 
@@ -66,160 +66,223 @@
       </template>
     </q-table>
 
-    <!-- <q-dialog v-model="auditDialog.show" persistent max-width="90vw" style="width: 1000px;">
-      <q-card class="row no-wrap" style="max-height: 85vh;">
+    <!-- 審核案件處理彈窗 (視覺極簡化：去色塊、去Icon、文字純淨流) -->
+    <q-dialog v-model="auditDialog.show" persistent>
+      <q-card style="width: 1000px; max-width: 95vw; height: 90vh;" class="column no-wrap bg-grey-1">
         
-        <q-btn 
-          icon="close" 
-          flat 
-          round 
-          dense 
-          v-close-popup 
-          class="absolute-top-right q-ma-sm text-grey-6" 
-          style="z-index: 10;"
-        /> -->
-        <q-dialog v-model="auditDialog.show" persistent>
-  <q-card style="width: 900px; max-width: 95vw;">
-    <!-- 關閉按鈕 -->
-    <q-btn icon="close" flat round dense v-close-popup class="absolute-top-right q-ma-sm" style="z-index: 10;" />
-              <q-card-section class="col-7 scroll">
-
-        <!-- <q-card-section class="col-7 q-pa-md scroll" style="border-right: 1px solid #e0e0e0"> -->
-          <div class="text-h6 text-weight-bold text-primary q-mb-md">案件核決處理</div>
-          
-          <div class="row q-col-gutter-sm">
-          <div class="col-6"><q-input v-model="auditDialog.form.claimNo" label="案件編號" dense outlined readonly bg-color="grey-2" /></div>
-          <div class="col-6"><q-input v-model="auditDialog.form.policyNo" label="保單號碼" dense outlined readonly bg-color="grey-2" /></div>
-          <div class="col-6"><q-input v-model="auditDialog.form.memberName" label="客戶姓名" dense outlined readonly bg-color="grey-2" /></div>
-          <div class="col-6"><q-input v-model="auditDialog.form.productName" label="商品名稱" dense outlined readonly bg-color="grey-2" /></div>
-          <div class="col-12"><q-input v-model="auditDialog.form.claimAmount" label="申請理賠金額" dense outlined readonly bg-color="grey-2" prefix="$" /></div>
-          <div class="col-12"><q-input v-model="auditDialog.form.remark" type="textarea" rows="2" label="原受理備註說明" dense outlined readonly bg-color="grey-2" /></div>
-        </div>
-
-          <!-- 檔案連結區塊 -->
-        <div class="q-mt-md" v-if="auditDialog.form.file01Path || auditDialog.form.file02Path">
-          <div class="text-subtitle2 q-mb-xs">佐證電子文件</div>
-          <div class="row q-gutter-sm">
-            <q-btn v-if="auditDialog.form.file01Path" color="indigo" outline icon="picture_as_pdf" :label="auditDialog.form.file01Name || '診斷書'" @click="viewPdf(auditDialog.form.file01Path)" />
-            <q-btn v-if="auditDialog.form.file02Path" color="indigo" outline icon="picture_as_pdf" :label="auditDialog.form.file02Name || '收據'" @click="viewPdf(auditDialog.form.file02Path)" />
-          </div>
-        </div>
-
-          <q-separator class="q-my-lg" />
-
-          <!-- 自動審核判斷面板 -->
-<div class="q-mt-md q-pa-sm rounded-borders" 
-     :class="auditRules.pass ? 'bg-green-1' : 'bg-red-1'">
-  <div class="text-weight-bold" :class="auditRules.pass ? 'text-green-9' : 'text-red-9'">
-    <q-icon :name="auditRules.pass ? 'check_circle' : 'warning'" class="q-mr-xs" />
-    系統自動審核：{{ auditRules.msg }}
-  </div>
-</div>
-
-          <div class="bg-indigo-1 q-pa-md rounded-borders">
-            <div class="text-subtitle1 text-weight-bold text-indigo q-mb-sm">審核人員簽核決策</div>
-            <div class="row q-col-gutter-sm">
-              <div class="col-12">
-                <q-input 
-                  v-model.number="auditForm.approveAmount" 
-                  type="number" 
-                  label="核決發放金額 (核准時必填)" 
-                  outlined 
-                  dense 
-                  prefix="$"
-                  :rules="[val => auditForm.action !== 'APPROVED' || (val !== null && val >= 0) || '同意核發時必須指定核決金額']"
-                />
-              </div>
-              <div class="col-12">
-                <q-input 
-                  v-model="auditForm.remark" 
-                  type="textarea" 
-                  rows="3" 
-                  label="核決審核意見 / 駁回、撤回理由原因" 
-                  outlined 
-                  dense 
-                  placeholder="請在此處輸入簽核具體意見..."
-                />
-              </div>
-            </div>
-            
-            <div class="row justify-end q-gutter-sm q-mt-md">
-              
-              <!-- 遞呈按鈕：只有當狀態是 SUBMIT 時出現 -->
-  <q-btn 
-    v-if="getUserRole() === 'APPLICANT' && auditDialog.form.claimStatus === 'SUBMIT'"
-    color="indigo-8" 
-    icon="send" 
-    label="送審遞呈 (SUBMIT -> PENDING)" 
-    @click="submitDecision('PENDING')" 
-  />
-  
-              <q-btn 
-                v-if="getUserRole() === 'APPLICANT'"
-                color="orange-8" 
-                icon="undo" 
-                label="撤回申請 (RETURN)" 
-                @click="submitDecision('RETURN')" 
-              />
-              
-              <!-- <template v-if="['REVIEWER', 'ADMIN'].includes(getUserRole())">
-                <template v-if="!['APPROVED', 'REJECTED'].includes(auditDialog.form.claimStatus)">
-                  <q-btn color="negative" icon="block" label="駁回拒絕 (REJECTED)" @click="submitDecision('REJECTED')" />
-                  <q-btn color="positive" icon="check_circle" label="同意核可 (APPROVED)" @click="submitDecision('APPROVED')" />
-                </template>
-              </template> -->
-              <template v-if="['REVIEWER', 'ADMIN'].includes(getUserRole())">
-    <template v-if="!['APPROVED', 'REJECTED'].includes(auditDialog.form.claimStatus)">
-      <q-btn color="negative" icon="block" label="駁回拒絕 (REJECTED)" @click="submitDecision('REJECTED')" />
-      <q-btn color="positive" icon="check_circle" label="同意核可 (APPROVED)" @click="submitDecision('APPROVED')" />
-    </template>
-  </template>
-            </div>
-          </div>
+        <!-- 頂部標題與關閉按鈕 -->
+        <q-card-section class="row items-center bg-teal-9 text-white q-py-sm">
+          <div class="text-h6 text-weight-bold">理賠案件核決與歷程</div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup />
         </q-card-section>
 
-        <q-card-section class="col-5 q-pa-md bg-grey-1 scroll">
-          <div class="text-subtitle1 text-weight-bold text-grey-9 q-mb-md">📜 本案審核歷程</div>
+        <!-- 主體內容 -->
+        <q-card-section class="row col q-col-gutter-md q-pa-md scroll">
           
-          <div v-if="historyLogs.length === 0" class="text-center text-grey-5 q-mt-xl">
-            <q-icon name="history" size="lg" /><br>暫無前次變更紀錄
-          </div>
-          
-          <div v-else class="q-gutter-y-sm">
-            <q-card 
-              v-for="log in historyLogs" 
-              :key="log.claimLogNo" 
-              flat 
-              bordered 
-              class="bg-white q-pa-sm"
-              :style="`border-left: 5px solid var(--q-${getStatusColor(log.claimStatus)})`"
-            >
-              <div class="row items-center justify-between q-mb-xs">
-                <q-badge :color="getStatusColor(log.claimStatus)" class="text-weight-bold">
-                  {{ log.claimStatus }}
-                </q-badge>
-                <div class="text-caption text-grey-6">{{ formatDate(log.aprvTime) }}</div>
-              </div>
+          <!-- ================= [左側固定區塊：工作面板] ================= -->
+          <div class="col-12 col-md-5 column q-gutter-y-md">
+            
+            <!-- 1. 當前案件核心卡片 (拿掉 Icon) -->
+            <q-card flat bordered class="bg-white border-teal">
+              <q-card-section class="q-pa-md">
+                <div class="text-caption text-grey-6 q-mb-xs">客戶姓名</div>
+                <div class="row items-baseline justify-between">
+                  <div class="text-h5 text-weight-bold text-teal-9">
+                    {{ auditDialog.form.memberName || '-' }}
+                  </div>
+                  <div class="text-subtitle1 text-weight-bold text-negative">
+                    申請金額: ${{ formatMoney(auditDialog.form.claimAmount) }}
+                  </div>
+                </div>
+              </q-card-section>
+            </q-card>
 
-              <div class="text-caption text-grey-8 q-mt-xs">
-                <div class="q-mb-xs"><strong>審核人員:</strong> {{ log.aprvUser || '系統' }}</div>
-                <div class="q-mb-xs">
-                  <strong>核准金額:</strong> 
-                  <span :class="log.approveAmount > 0 ? 'text-weight-bold text-negative' : 'text-grey-6'">
-                    {{ log.approveAmount > 0 ? `$${log.approveAmount}` : '無' }}
-                  </span>
+            <!-- 2. 自動審核面板 (依您的建議：完全拿掉綠底、紅底、灰底與 Icon，字體顏色與一般輸入框文字相同) -->
+            <q-card flat bordered class="bg-white">
+              <q-card-section class="q-pa-md">
+                <div class="text-caption text-grey-6 q-mb-xs">系統自動審核</div>
+                <div 
+  class="text-body1 text-weight-medium" 
+  :class="auditRules.pass ? 'text-teal-9' : 'text-negative'"
+>
+  {{ auditRules.msg }}
+</div>
+              </q-card-section>
+            </q-card>
+
+            <!-- 3. 審核人員填寫卡片 (依狀態顯示對應的結案/處理文字，並隱藏輸入框) -->
+            <q-card flat bordered class="bg-white col column no-wrap">
+              <q-card-section class="q-pa-md column q-gutter-y-sm full-height col">
+                
+                <!-- 當狀態為 PENDING, RETURN, APPROVED, REJECTED 時，顯示對應的綠色狀態文字 -->
+                <div 
+                  v-if="['PENDING', 'RETURN', 'APPROVED', 'REJECTED'].includes(auditDialog.form.claimStatus)" 
+                  class="col column justify-center items-center q-py-xl"
+                >
+                  <div class="text-h6 text-weight-bold text-teal-9">
+                    <span v-if="auditDialog.form.claimStatus === 'PENDING'">案件處理中</span>
+                    <span v-else-if="auditDialog.form.claimStatus === 'RETURN'">退回補件中</span>
+                    <span v-else-if="auditDialog.form.claimStatus === 'APPROVED'">已結案-核准</span>
+                    <span v-else-if="auditDialog.form.claimStatus === 'REJECTED'">已結案-駁回</span>
+                  </div>
                 </div>
                 
-                <div class="bg-grey-2 q-pa-xs rounded-borders text-grey-9 q-mt-sm" style="min-height: 32px;">
-                  <strong>意見:</strong> {{ log.aprvRemark || '未填寫意見' }}
+                <!-- 預設狀態才顯示發放金額與意見輸入框 -->
+                <template v-else>
+                  <div>
+                    <q-input 
+                      :model-value="formatMoney(auditForm.approveAmount)" 
+                      @update:model-value="onAmountInput"
+                      label="核決發放金額" 
+                      outlined 
+                      dense 
+                      color="teal"
+                      prefix="$"
+                      lazy-rules
+                      :rules="[val => auditForm.action !== 'APPROVED' || (auditForm.approveAmount !== null && auditForm.approveAmount >= 0) || '同意核發時必須指定核決金額']"
+                    />
+                  </div>
+                  
+                  <div class="col">
+                    <q-input 
+                      v-model="auditForm.remark" 
+                      type="textarea" 
+                      rows="4" 
+                      label="核決審核意見 / 理由原因" 
+                      outlined 
+                      dense 
+                      color="teal"
+                      placeholder="請在此處輸入簽核具體意見..."
+                      class="full-height"
+                    />
+                  </div>
+                </template>
+                
+                <!-- 操作按鈕群 -->
+                <div class="row justify-end q-gutter-sm q-mt-sm">
+                  <q-btn 
+                    v-if="getUserRole() === 'APPLICANT' && auditDialog.form.claimStatus === 'SUBMIT'"
+                    color="teal-7" 
+                    label="送審遞呈" 
+                    @click="submitDecision('PENDING')" 
+                  />
+                  <!-- 撤回按鈕：排除 PENDING, RETURN, APPROVED, REJECTED 狀態 -->
+                  <q-btn 
+                    v-if="getUserRole() === 'APPLICANT' && !['PENDING', 'RETURN', 'APPROVED', 'REJECTED'].includes(auditDialog.form.claimStatus)"
+                    color="grey-7" 
+                    label="撤回申請" 
+                    @click="submitDecision('RETURN')" 
+                  />
+                  <template v-if="['REVIEWER', 'ADMIN'].includes(getUserRole())">
+                    <template v-if="!['APPROVED', 'REJECTED'].includes(auditDialog.form.claimStatus)">
+                      <q-btn color="red-8" label="駁回拒絕" @click="submitDecision('REJECTED')" />
+                      <q-btn color="teal-9" label="同意核可" @click="submitDecision('APPROVED')" />
+                    </template>
+                  </template>
                 </div>
-              </div>
+              </q-card-section>
             </q-card>
           </div>
-        </q-card-section>
 
+          <!-- ================= [右側動態區塊：小頁籤切換] ================= -->
+          <div class="col-12 col-md-7 column">
+            <q-card flat bordered class="col column no-wrap bg-white">
+              
+              <!-- 頁籤控制 (🌟 依您的建議：拿掉 icon、調整歷程數字右移與間距) -->
+              <q-tabs
+                v-model="activeTab"
+                dense
+                class="text-grey-7"
+                active-color="teal"
+                indicator-color="teal"
+                align="left"
+                narrow-indicator
+              >
+                <q-tab name="detail" label="案件詳情與文件" class="q-mr-sm" />
+                <q-tab name="history" class="q-px-md">
+                  <div class="row items-center no-wrap">
+                    <div>本案審核歷程</div>
+                    <!-- 🌟 數字單獨包在 div 裡，向右推開外距 (q-ml-sm)，視覺更美觀 -->
+                    <q-badge v-if="historyLogs.length > 0" color="teal" class="q-ml-sm">
+                      {{ historyLogs.length }}
+                    </q-badge>
+                  </div>
+                </q-tab>
+              </q-tabs>
+
+              <q-separator />
+
+              <!-- 頁籤內容面板群組 -->
+              <q-tab-panels v-model="activeTab" animated class="col scroll bg-white">
+                
+                <!-- 頁籤一：基本資訊與文件 -->
+                <q-tab-panel name="detail" class="q-pa-md q-gutter-y-md">
+                  <div class="row q-col-gutter-sm">
+                    <div class="col-6"><q-input v-model="auditDialog.form.claimNo" label="案件編號" dense outlined readonly bg-color="grey-1" /></div>
+                    <div class="col-6"><q-input v-model="auditDialog.form.policyNo" label="保單號碼" dense outlined readonly bg-color="grey-1" /></div>
+                    <div class="col-6"><q-input v-model="auditDialog.form.memberName" label="客戶姓名" dense outlined readonly bg-color="grey-1" /></div>
+                    <div class="col-6"><q-input v-model="auditDialog.form.productName" label="商品名稱" dense outlined readonly bg-color="grey-1" /></div>
+                    <div class="col-12"><q-input v-model="auditDialog.form.remark" type="textarea" rows="3" label="原受理備註說明" dense outlined readonly bg-color="grey-1" /></div>
+                  </div>
+
+                  <!-- 檔案連結區塊 (依您的建議：拿掉背景灰底、拿掉 icon) -->
+                  <div v-if="auditDialog.form.file01Path || auditDialog.form.file02Path" class="q-mt-md">
+                    <div class="text-subtitle2 text-weight-bold text-grey-8 q-mb-xs">佐證電子文件 (點擊開啟)</div>
+                    <div class="row q-gutter-sm q-py-xs">
+                      <q-btn v-if="auditDialog.form.file01Path" color="teal" outline :label="auditDialog.form.file01Name || '診斷書'" @click="viewPdf(auditDialog.form.file01Path)" />
+                      <q-btn v-if="auditDialog.form.file02Path" color="teal" outline :label="auditDialog.form.file02Name || '收據'" @click="viewPdf(auditDialog.form.file02Path)" />
+                    </div>
+                  </div>
+                </q-tab-panel>
+
+                <!-- 頁籤二：審核歷史歷程軌跡 -->
+                <q-tab-panel name="history" class="q-pa-md bg-grey-1">
+                  <div v-if="historyLogs.length === 0" class="text-center text-grey-5 q-mt-xl">
+                    暫無前次變更紀錄
+                  </div>
+                  
+                  <div v-else class="q-gutter-y-sm">
+                    <q-card 
+                      v-for="log in historyLogs" 
+                      :key="log.claimLogNo" 
+                      flat 
+                      bordered 
+                      class="bg-white q-pa-sm"
+                      :style="`border-left: 5px solid var(--q-${getStatusColor(log.claimStatus)})`"
+                    >
+                      <div class="row items-center justify-between q-mb-xs">
+                        <q-badge :color="getStatusColor(log.claimStatus)" class="text-weight-bold">
+                          {{ log.claimStatus }}
+                        </q-badge>
+                        <div class="text-caption text-grey-6">{{ formatDate(log.aprvTime) }}</div>
+                      </div>
+
+                      <div class="text-caption text-grey-8 q-mt-xs">
+                        <div class="q-mb-xs"><strong>審核人員:</strong> {{ log.aprvUser || '系統' }}</div>
+                        <div class="q-mb-xs">
+                          <strong>核准金額:</strong> 
+                          <span :class="log.approveAmount > 0 ? 'text-weight-bold text-teal-9' : 'text-grey-6'">
+                            {{ log.approveAmount > 0 ? `$${formatMoney(log.approveAmount)}` : '無' }}
+                          </span>
+                        </div>
+                        
+                        <div class="bg-grey-2 q-pa-xs rounded-borders text-grey-9 q-mt-sm" style="min-height: 32px;">
+                          <strong>意見:</strong> {{ log.aprvRemark || '未填寫意見' }}
+                        </div>
+                      </div>
+                    </q-card>
+                  </div>
+                </q-tab-panel>
+
+              </q-tab-panels>
+            </q-card>
+          </div>
+
+        </q-card-section>
       </q-card>
     </q-dialog>
+    
   </div>
 </template>
 
@@ -235,26 +298,27 @@ const historyLogs = ref<any[]>([])
 
 const filters = reactive({ status: '', policyNo: '' })
 const statusOptions = [
-  { label: '顯示全部待處理 (SUBMIT / PENDING / RETURN)', value: '' },
-  { label: 'SUBMIT (新件待審)', value: 'SUBMIT' },
-  { label: 'PENDING (審核中)', value: 'PENDING' },
-  { label: 'APPROVED (已結案-准予)', value: 'APPROVED' },
-  { label: 'REJECTED (已結案-駁回)', value: 'REJECTED' },
-  { label: 'RETURN (已被撤回)', value: 'RETURN' }
+  { label: '顯示全部處理中 (SUBMIT / PENDING / RETURN)', value: '' },
+  { label: '最新案件待處理 (SUBMIT)', value: 'SUBMIT' },
+  { label: '審核中 (PENDING)', value: 'PENDING' },
+  { label: '已結案-核准 (APPROVED)', value: 'APPROVED' },
+  { label: '已結案-駁回 (REJECTED)', value: 'REJECTED' },
+  { label: '已被撤回須補件 (RETURN)', value: 'RETURN' }
 ]
 
 const columns: QTableColumn[] = [
   { name: 'claimNo', label: '理賠案號', field: 'claimNo', align: 'left', sortable: true },
   { name: 'memberName', label: '客戶姓名', field: 'memberName', align: 'left' },
   { name: 'policyNo', label: '保單號碼', field: 'policyNo', align: 'left' },
-  { name: 'claimAmount', label: '申請理賠金', field: 'claimAmount', align: 'right' },
-  { name: 'approveAmount', label: '核決理賠金', field: 'approveAmount', align: 'right', format: val => val !== null ? `$${val}` : '尚未核決' },
+  { name: 'claimAmount', label: '申請理賠金', field: 'claimAmount', align: 'right', format: val => `$${formatMoney(val)}` },
+  { name: 'approveAmount', label: '核決理賠金', field: 'approveAmount', align: 'right', format: val => val !== null ? `$${formatMoney(val)}` : '尚未核決' },
   { name: 'claimStatus', label: '當前關卡狀態', field: 'claimStatus', align: 'center' },
   { name: 'actions', label: '審核簽准', field: 'actions', align: 'center' }
 ]
 
 const auditDialog = reactive({ show: false, form: {} as any })
 const auditForm = reactive({ action: '', approveAmount: null as number | null, remark: '' })
+const activeTab = ref('detail') // 預設進來彈窗時，停在「案件詳情與文件」頁籤
 
 // 載入審核清單
 async function loadAuditData() {
@@ -293,19 +357,46 @@ async function openAuditDialog(row: any) {
   auditForm.action = ''
   auditForm.approveAmount = row.claimStatus === 'APPROVED' ? row.approveAmount : row.claimAmount
   auditForm.remark = ''
+  activeTab.value = 'detail' // 每次開新彈窗時，都要強迫重置回第一個分頁
 }
 
 // 提交核決：同意、駁回、或撤回
 async function submitDecision(actionType: string) {
-  auditForm.action = actionType
+  // auditForm.action = actionType
   
-  if (actionType === 'APPROVED' && (auditForm.approveAmount === null || auditForm.approveAmount < 0)) {
+  // if (actionType === 'APPROVED' && (auditForm.approveAmount === null || auditForm.approveAmount < 0)) {
+  //   $q.notify({ type: 'warning', message: '必須填寫正確的核決理賠金額！' })
+  //   return
+  // }
+auditForm.action = actionType
+  
+  // 🌟 如果欄位不幸被清空變成 null 或 undefined，強行校正為 0，絕對不讓 null 進 DB
+  if (auditForm.approveAmount === null || auditForm.approveAmount === undefined) {
+    auditForm.approveAmount = 0
+  }
+  
+  if (actionType === 'APPROVED' && auditForm.approveAmount < 0) {
     $q.notify({ type: 'warning', message: '必須填寫正確的核決理賠金額！' })
     return
   }
+  // 【黃金防盾】送出前，強制把畫面上千分位輸入框的值，洗成純數字存回 auditForm
+  // if (displayApproveAmount.value) {
+  //   const cleanNum = displayApproveAmount.value.replace(/,/g, '').trim()
+  //   auditForm.approveAmount = cleanNum === '' ? 0 : Number(cleanNum)
+  // } else {
+  //   auditForm.approveAmount = 0
+  // }
+
+  // auditForm.action = actionType
+  
+  // // 如果是同意結案，強制檢查金額必須大於等於 0 且不能是 null
+  // if (actionType === 'APPROVED' && (auditForm.approveAmount === null || auditForm.approveAmount === undefined || auditForm.approveAmount < 0)) {
+  //   $q.notify({ type: 'warning', message: '必須填寫正確的核決理賠金額！' })
+  //   return
+  // }
 
   $q.dialog({
-    title: '📢 審核確認送出',
+    title: '審核確認送出',
     message: `您即將要把本案判定為 [ ${actionType} ]，此作業將會同步存入變更歷程 Log 檔案中，是否確認？`,
     cancel: true,
     persistent: true
@@ -326,9 +417,12 @@ async function submitDecision(actionType: string) {
       await axios.put('/api/admin/claim-audit/decision', {
         claimNo: auditDialog.form.claimNo,
         action: auditForm.action,
-        approveAmount: auditForm.action === 'APPROVED' ? auditForm.approveAmount : null,
+        // 新的：APPROVED 和 PENDING 保留金額，只有 REJECTED/RETURN 才送 null
+approveAmount: ['APPROVED', 'PENDING'].includes(auditForm.action)
+  ? auditForm.approveAmount
+  : null,
         remark: auditForm.remark,
-        aprvUser: currentUserName // 🌟 這次送出的就會是精準的 "管理員" 囉！
+        aprvUser: currentUserName //  這次送出的就會是精準的 "管理員" 囉！
       })
       $q.notify({ type: 'positive', message: '理賠核決與履歷更新成功！' })
       auditDialog.show = false
@@ -430,6 +524,27 @@ function viewPdf(path: string | undefined) {
     }
   }
 
-  return { pass: true, msg: '✅ 保單效期與等待期檢查通過' };
+  return { pass: true, msg: '保單效期與等待期檢查通過' };
 });
+
+// 新增：千分位轉換工具
+function formatMoney(val: any) {
+  if (val === null || val === undefined || isNaN(Number(val))) return '0'
+  return Number(val).toLocaleString('en-US')
+}
+
+// 🌟 專門處理千分位輸入框的清洗函式，徹底解決 TS 型別與 null 問題
+function onAmountInput(val: string | number | null) {
+  if (val === null || val === undefined) {
+    auditForm.approveAmount = 0;
+    return;
+  }
+  
+  // 強制轉字串後，拔掉所有逗號
+  const cleanNum = String(val).replace(/,/g, '').trim();
+  
+  // 如果被刪光了就給 0，否則轉成標準 Number 存回後端需要的變數
+  auditForm.approveAmount = cleanNum === '' ? 0 : Number(cleanNum);
+}
+
 </script>
