@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import NotificationBell from '@/components/NotificationBell.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -61,9 +62,7 @@ function handleLogout() {
     </button>
 
     <div class="header-right">
-      <button type="button" class="header-bell" aria-label="通知">
-        <q-icon name="notifications" size="22px" />
-      </button>
+      <NotificationBell />
 
       <span class="header-name">{{ displayName }}</span>
 

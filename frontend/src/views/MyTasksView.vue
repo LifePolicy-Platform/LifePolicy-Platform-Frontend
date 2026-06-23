@@ -1,27 +1,79 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import PageHero from '@/components/layout/PageHero.vue'
+import { useAuthStore } from '@/stores/auth'
 import { useMyTasks } from '@/composables/useMyTasks'
-import type { TaskStatus } from '@/types/task'
-import { TASK_STATUS_LABEL, TASK_STATUS_OPTIONS } from '@/constants/task'
 
-const { filter, filteredTasks, pendingCount, isLoading, search, resetFilter } = useMyTasks()
+const {
+  filteredTasks,
+  pendingCount,
+  isLoading,
+  errorMessage,
+  keyword,
+  statusFilter,
+  search,
+  resetFilter,
+  STATUS_LABEL,
+  STATUS_COLOR,
+} = useMyTasks()
 
-function taskStatusLabel(status: TaskStatus) {
-  return TASK_STATUS_LABEL[status]
+const router = useRouter()
+const authStore = useAuthStore()
+
+onMounted(() => search())
+
+function goToQuery(policyNo: string) {
+  router.push({ path: '/policy-mgmt', query: { tab: 'query', policyNo } })
 }
 
-onMounted(() => {
-  search()
+const isReviewer = computed(() => authStore.roles.includes('REVIEWER'))
+
+// 依角色決定可選狀態
+const statusOptions = computed(() => {
+  if (isReviewer.value) {
+    return [
+      { label: '全部', value: '' },
+      { label: '待主管審核', value: 'PENDING' },
+    ]
+  }
+  return [
+    { label: '全部', value: '' },
+    { label: '待業務審核', value: 'SUBMIT' },
+    { label: '已退回',     value: 'RETURN' },
+  ]
+})
+
+// 依角色過濾清單（APPLICANT 不看 PENDING，REVIEWER 只看 PENDING）
+const APPLICANT_STATUSES = ['SUBMIT', 'RETURN']
+const REVIEWER_STATUSES  = ['PENDING']
+
+const roleFilteredTasks = computed(() => {
+  const allowed = isReviewer.value ? REVIEWER_STATUSES : APPLICANT_STATUSES
+  return filteredTasks.value.filter(t => allowed.includes(t.APPLICATION_STATUS))
 })
 
 const columns = [
-  { name: 'taskNo', label: '編號', field: 'taskNo', align: 'left' as const },
-  { name: 'taskName', label: '案件名稱', field: 'taskName', align: 'left' as const },
-  { name: 'status', label: '狀態', field: 'status', align: 'left' as const },
+  { name: 'APPLICATION_ID', label: '保單號碼', field: 'APPLICATION_ID', align: 'left' as const },
+  { name: 'APPLICANT_NAME', label: '要保人',   field: 'APPLICANT_NAME', align: 'left' as const },
+  { name: 'INSURED_NAME',   label: '被保人',   field: 'INSURED_NAME',   align: 'left' as const },
+  { name: 'PRODUCT_NAME',   label: '商品',     field: 'PRODUCT_NAME',   align: 'left' as const },
+  {
+    name: 'SUM_INSURED',
+    label: '保額',
+    field: 'SUM_INSURED',
+    align: 'right' as const,
+    format: (v: number) => v != null ? v.toLocaleString() : '-',
+  },
+  { name: 'APPLICATION_STATUS', label: '狀態', field: 'APPLICATION_STATUS', align: 'left' as const },
+  {
+    name: 'SUBMISSION_TIME',
+    label: '申請時間',
+    field: 'SUBMISSION_TIME',
+    align: 'left' as const,
+    format: (v: string) => v ? v.slice(0, 16).replace('T', ' ') : '-',
+  },
 ]
-
-const statusOptions = [{ label: '全部', value: '' }, ...TASK_STATUS_OPTIONS]
 </script>
 
 <template>
@@ -29,6 +81,7 @@ const statusOptions = [{ label: '全部', value: '' }, ...TASK_STATUS_OPTIONS]
     <PageHero title="個人待辦案件" :subtitle="`未完成：${pendingCount} 件`" />
 
     <div class="page-body">
+      <!-- 篩選列 -->
       <q-card flat class="page-card page-card--filter q-mb-md">
         <q-card-section>
           <div class="page-card__header q-mb-sm">
@@ -39,63 +92,71 @@ const statusOptions = [{ label: '全部', value: '' }, ...TASK_STATUS_OPTIONS]
           </div>
           <div class="row q-col-gutter-md items-end">
             <div class="col-12 col-md-4">
-              <q-input v-model="filter.keyword" label="關鍵字" dense outlined clearable />
+              <q-input v-model="keyword" label="關鍵字（保單號、要保人、商品）" dense outlined clearable />
             </div>
             <div class="col-12 col-md-3">
               <q-select
-                v-model="filter.status"
+                v-model="statusFilter"
                 :options="statusOptions"
                 label="狀態"
-                dense
-                outlined
-                emit-value
-                map-options
+                dense outlined emit-value map-options
               />
             </div>
             <div class="col-12 col-md-3 flex q-gutter-sm">
-              <q-btn color="primary" unelevated label="查詢" icon="search" @click="search" />
+              <q-btn color="primary" unelevated label="查詢" icon="search" :loading="isLoading" @click="search" />
               <q-btn flat label="清除" @click="resetFilter" />
             </div>
           </div>
         </q-card-section>
       </q-card>
 
+      <!-- 錯誤訊息 -->
+      <q-banner v-if="errorMessage" rounded class="bg-red-1 text-red-8 q-mb-md">
+        {{ errorMessage }}
+      </q-banner>
+
+      <!-- 清單 -->
       <q-card flat class="page-card page-card--data">
         <q-card-section>
           <div class="page-card__header q-mb-md">
             <div>
               <p class="page-card__kicker">TASK LIST</p>
               <div class="page-card__title">待辦清單</div>
-              <p class="page-card__desc">共 {{ filteredTasks.length }} 筆結果</p>
+              <p class="page-card__desc">共 {{ roleFilteredTasks.length }} 筆結果</p>
             </div>
           </div>
           <q-table
             class="app-table"
-            :rows="filteredTasks"
+            :rows="roleFilteredTasks"
             :columns="columns"
-            row-key="taskNo"
-            flat
-            bordered
-            dense
+            row-key="APPLICATION_ID"
+            flat bordered dense
             :loading="isLoading"
-            no-data-label="尚無待辦事項"
+            no-data-label="目前沒有待處理案件"
           >
-            <template #body-cell-status="props">
+            <template #body-cell-APPLICATION_ID="props">
+              <q-td :props="props">
+                <span class="policy-no-link" @click="goToQuery(props.row.APPLICATION_ID)">
+                  {{ props.row.APPLICATION_ID }}
+                </span>
+              </q-td>
+            </template>
+
+            <template #body-cell-APPLICATION_STATUS="props">
               <q-td :props="props">
                 <q-chip
-                  dense
-                  size="sm"
-                  :color="props.row.status === 'done' ? 'positive' : props.row.status === 'in_progress' ? 'info' : 'warning'"
+                  dense size="sm"
+                  :color="STATUS_COLOR[props.row.APPLICATION_STATUS] ?? 'grey'"
                   text-color="white"
                 >
-                  {{ taskStatusLabel(props.row.status) }}
+                  {{ STATUS_LABEL[props.row.APPLICATION_STATUS] ?? props.row.APPLICATION_STATUS }}
                 </q-chip>
               </q-td>
             </template>
             <template #no-data>
               <div class="page-empty">
                 <q-icon name="inbox" class="page-empty__icon" />
-                <div>尚無待辦事項</div>
+                <div>目前沒有待處理案件</div>
               </div>
             </template>
           </q-table>
@@ -104,3 +165,19 @@ const statusOptions = [{ label: '全部', value: '' }, ...TASK_STATUS_OPTIONS]
     </div>
   </section>
 </template>
+
+<style scoped>
+.policy-no-link {
+  color: #38a169;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.policy-no-link:hover {
+  color: #276749;
+}
+</style>

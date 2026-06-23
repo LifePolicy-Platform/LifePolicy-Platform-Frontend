@@ -262,6 +262,7 @@ async function handleLogin() {
   font-size: 1.5rem;
   font-weight: 700;
   color: #064e3b;
+  text-align: center;
 }
 .card-desc {
   margin: 0;

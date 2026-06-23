@@ -75,7 +75,7 @@
       <q-card style="width: 600px; max-width: 90vw;">
         <q-card-section class="row items-center q-pb-none">
           <div class="text-h6 text-weight-bold">
-            {{ dialog.isView ? '🔍 案件詳細資料' : dialog.form.claimNo ? '修改理賠資料' : '新增理賠案件' }}
+            {{ dialog.isView ? '理賠案件資料' : dialog.form.claimNo ? '修改理賠資料' : '新增理賠案件' }}
           </div>
           <q-space />
           <q-btn icon="close" flat round dense v-close-popup />
@@ -124,8 +124,16 @@
             <div :class="dialog.form.memberName ? 'col-6' : 'col-12'">
               <q-input v-model.number="dialog.form.memberId" type="number" label="客戶 ID" dense outlined :readonly="dialog.isView" />
             </div>
-            <div class="col-6" v-if="dialog.form.memberName">
-              <q-input :model-value="dialog.form.memberName" label="客戶姓名" dense outlined readonly bg-color="blue-1" />
+            <!-- 修改後：優先透過 ID 從 preloaded Map 中抓取正確真實姓名 -->
+            <div class="col-6" v-if="dialog.form.memberId || dialog.form.memberName">
+              <q-input 
+                :model-value="memberNameMap[dialog.form.memberId] || dialog.form.memberName || ''" 
+                label="客戶姓名" 
+                dense 
+                outlined 
+                readonly 
+                bg-color="blue-1" 
+              />
             </div>
           </template>
 
@@ -168,13 +176,20 @@
             </div>
           </template>
 
+          <!-- 原本的兩個金額欄位，替換為以下代碼 -->
           <div class="col-6">
-            <q-input v-model.number="dialog.form.claimAmount" type="number" label="申請理賠金額" dense outlined :readonly="dialog.isView" />
+            <q-input 
+              v-model="displayClaimAmount" 
+              label="申請理賠金額" 
+              dense 
+              outlined 
+              prefix="$"
+              :readonly="dialog.isView" 
+            />
           </div>
           <div class="col-6">
             <q-input
-              v-model.number="dialog.form.approveAmount"
-              type="number"
+              :model-value="displayApproveAmount"
               label="核決理賠金額"
               dense
               outlined
@@ -333,7 +348,7 @@
                 <q-btn class="full-width" color="indigo-7" outline icon="picture_as_pdf" :label="dialog.form.file02Name || '醫療收據'" @click="viewPdf(dialog.form.file02Path)" />
               </div>
               <div v-if="!dialog.form.file01Path && !dialog.form.file02Path" class="col-12 text-grey-6 text-caption text-center q-pa-sm bg-grey-2 rounded-borders">
-                ⚠️ 本案暫無附帶任何電子文件
+                本案暫無附帶任何電子文件
               </div>
             </div>
           </div>
@@ -379,11 +394,11 @@ const $q = useQuasar()
 
 const filters = reactive({ status: '', policyNo: '', applyDate: '' })
 const statusOptions = [
-  { label: 'SUBMIT (新件待審)', value: 'SUBMIT' },
-  { label: 'PENDING (審核中)', value: 'PENDING' },
-  { label: 'APPROVED (已結案-准予)', value: 'APPROVED' },
-  { label: 'REJECTED (已結案-駁回)', value: 'REJECTED' },
-  { label: 'RETURN (已被撤回)', value: 'RETURN' }
+  { label: '最新案件待處理 (SUBMIT)', value: 'SUBMIT' },
+  { label: '審核中 (PENDING)', value: 'PENDING' },
+  { label: '已結案-核准 (APPROVED)', value: 'APPROVED' },
+  { label: '已結案-駁回 (REJECTED)', value: 'REJECTED' },
+  { label: '已被撤回須補件 (RETURN)', value: 'RETURN' }
 ]
 
 const loading = ref(false)
@@ -398,12 +413,55 @@ function formatDate(dateStr: any) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
+// 新增：千分位轉換工具
+function formatMoney(val: any) {
+  if (val === null || val === undefined || isNaN(Number(val))) return '0'
+  return Number(val).toLocaleString('en-US')
+}
+
+// 新增：彈窗「申請理賠金額」雙向千分位綁定
+const displayClaimAmount = computed({
+  get() {
+    if (dialog.form.claimAmount === null || dialog.form.claimAmount === undefined) return ''
+    return formatMoney(dialog.form.claimAmount)
+  },
+  set(val: string) {
+    // 移除非數字的逗號
+    const cleanNum = val.replace(/,/g, '').trim()
+    if (cleanNum === '') {
+      dialog.form.claimAmount = 0
+    } else {
+      const parsed = Number(cleanNum)
+      dialog.form.claimAmount = isNaN(parsed) ? 0 : parsed
+    }
+  }
+})
+
+// 新增：彈窗「核決金額」唯讀千分位顯示
+const displayApproveAmount = computed(() => {
+  if (dialog.form.approveAmount === null || dialog.form.approveAmount === undefined) return '尚未核決'
+  return `$${formatMoney(dialog.form.approveAmount)}`
+})
+
+// 新增：客戶 ID 對照真實真實姓名的 Lookup Map
+const memberNameMap = computed(() => {
+  const map: Record<number, string> = {}
+  memberOptions.value.forEach(m => {
+    if (m.memberId) {
+      // 優先取用正確的 name 欄位
+      map[m.memberId] = m.name || m.username || ''
+    }
+  })
+  return map
+})
+
 const columns: QTableProps['columns'] = [
   { name: 'claimNo', label: '理賠案號', field: 'claimNo', align: 'left', sortable: true },
   { name: 'policyNo', label: '保單號碼', field: 'policyNo', align: 'left' },
-  { name: 'memberName', label: '客戶姓名', field: 'memberName', align: 'left' },
-  { name: 'claimAmount', label: '申請金額', field: 'claimAmount', align: 'right' },
-  { name: 'approveAmount', label: '核決金額', field: 'approveAmount', align: 'right', format: (val: any) => val ?? '-' },
+  { name: 'memberName', label: '客戶姓名', field: 'memberName', align: 'left',
+    format: (val, row) => memberNameMap.value[row.memberId] || val || '-' },
+  { name: 'claimAmount', label: '申請金額', field: 'claimAmount', align: 'right', format: (val: any) => `$${formatMoney(val)}`},
+  { name: 'approveAmount', label: '核決金額', field: 'approveAmount', align: 'right', format: (val: any) => val !== null && val !== undefined ? `$${formatMoney(val)}` : '-' },
   { name: 'applyTime', label: '申請日', field: 'applyTime', align: 'right', format: val => formatDate(val) },
   { name: 'claimStatus', label: '狀態', field: 'claimStatus', align: 'center' },
   // { name: 'updateUser', label: '異動人員', field: 'updateUser', align: 'center' },
@@ -725,14 +783,65 @@ async function viewDetail(row: ClaimModel) {
 }
 
 async function saveClaim() {
+  // 1. 原有的：檢查保單號碼與客戶 ID
   if (!dialog.form.policyNo || !dialog.form.memberId) {
     $q.notify({ type: 'warning', message: '請填寫保單號碼與客戶ID' })
+    return
+  }
+
+  // 2. 檢查申請金額
+  if (!dialog.form.claimAmount || Number(dialog.form.claimAmount) <= 0) {
+    $q.notify({ type: 'warning', message: '申請理賠金額必須大於 0' })
+    return
+  }
+
+  // 3. 檢查理賠備註
+  if (!dialog.form.remark || !dialog.form.remark.trim()) {
+    $q.notify({ type: 'warning', message: '請填寫理賠備註原因' })
     return
   }
 
   if (isSubmitting.value) return
   isSubmitting.value = true
 
+  // 🌟 核心防呆：如果是修改模式，且該案目前為「PENDING」狀態
+  if (dialog.form.claimNo && dialog.form.claimStatus === 'PENDING') {
+    $q.dialog({
+      title: '重新送審提示',
+      message: '本案目前處於「審核中 (PENDING)」階段。若確認進行修改儲存，案件狀態將重設為「新件待審 (SUBMIT)」並重新提交審核，是否確定？',
+      cancel: {
+        label: '取消修改',
+        color: 'grey'
+      },
+      ok: {
+        label: '確定送審',
+        color: 'primary'
+      },
+      persistent: true
+    }).onOk(async () => {
+      try {
+        // 1. 強制將狀態設定為 'SUBMIT'
+        dialog.form.claimStatus = 'SUBMIT'
+        
+        // 2. 呼叫更新 API 送出
+        await updateClaimApi(dialog.form.claimNo, dialog.form)
+        $q.notify({ type: 'positive', message: '修改成功，已重新提交審核！' })
+        
+        dialog.show = false
+        loadData()
+      } catch (err) {
+        $q.notify({ type: 'negative', message: '儲存理賠案件時發生錯誤' })
+      } finally {
+        isSubmitting.value = false
+      }
+    }).onCancel(() => {
+      isSubmitting.value = false
+    })
+    
+    return // 阻斷下方直接儲存的流程
+  }
+
+  // 以下為常規儲存流程 (新增案件，或非 PENDING 狀態的修改案件)
   try {
     if (dialog.form.claimNo) {
       await updateClaimApi(dialog.form.claimNo, dialog.form)
@@ -814,7 +923,7 @@ function viewPdf(path: string | undefined) {
 
   // 2. 如果路徑是 /uploads/...，直接加上後端 Base URL
   // 請確認 import.meta.env.VITE_API_BASE_URL 有值
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8085s';
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8085';
   
   // 組合網址：確保中間只有一個斜線
   const cleanBase = baseUrl.replace(/\/$/, '');
@@ -842,5 +951,6 @@ async function preloadAgentOptions() {
 onMounted(() => {
   loadData()
   preloadAgentOptions()
+  fetchOptionsData() // 預載所有客戶、保單與經辦資料
 })
 </script>

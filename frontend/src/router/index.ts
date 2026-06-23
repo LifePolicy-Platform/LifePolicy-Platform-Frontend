@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory, type RouteMeta } from 'vue-router'
+﻿import { createRouter, createWebHistory, type RouteMeta } from 'vue-router'
 import { setupRouterGuards } from './guards'
 import HomeView from '../views/HomeView.vue'
 import MyTasksView from '../views/MyTasksView.vue'
@@ -157,7 +157,7 @@ const router = createRouter({
       path: '/users',
       name: 'users',
       component: UsersView,
-      meta: { title: '使用者管理', label: '使用者權限管理', requiresAuth: true, requiresRole: 'ADMIN' },
+      meta: { title: '使用者管理', label: '使用者權限管理', requiresAuth: true, requiresRole: 'ADMIN', hasTopHero: true },
     },
     {
       path: '/workbench',

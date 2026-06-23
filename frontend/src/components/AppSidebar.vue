@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { SidebarNavItem } from '@/constants/navigation'
 import { scrollPageToTop } from '@/utils/scroll'
@@ -7,8 +7,6 @@ import { scrollPageToTop } from '@/utils/scroll'
 const props = defineProps<{
   items: readonly SidebarNavItem[]
 }>()
-
-const searchQuery = ref('')
 
 function onNavClick() {
   scrollPageToTop()
@@ -20,19 +18,10 @@ interface NavGroup {
   items: SidebarNavItem[]
 }
 
-const filteredGroups = computed<NavGroup[]>(() => {
-  const q = searchQuery.value.trim().toLowerCase()
+const navGroups = computed<NavGroup[]>(() => {
   const groupMap = new Map<string, NavGroup>()
 
   for (const item of props.items) {
-    const match =
-      !q ||
-      item.label.toLowerCase().includes(q) ||
-      item.title.toLowerCase().includes(q) ||
-      item.group.toLowerCase().includes(q)
-
-    if (!match) continue
-
     const existing = groupMap.get(item.group)
     if (existing) {
       existing.items.push(item)
@@ -47,61 +36,40 @@ const filteredGroups = computed<NavGroup[]>(() => {
 
   return Array.from(groupMap.values()).sort((a, b) => a.order - b.order)
 })
-
-const hasResults = computed(() => filteredGroups.value.length > 0)
 </script>
 
 <template>
   <aside class="app-sidebar">
-
-    <div class="sidebar-search">
-      <q-input
-        v-model="searchQuery"
-        dense
-        borderless
-        placeholder="Search Menus"
-        class="sidebar-search__input"
-      >
-        <template #append>
-          <q-icon name="search" size="18px" />
-        </template>
-      </q-input>
-    </div>
-
     <nav class="sidebar-menu" aria-label="主選單">
-      <template v-if="hasResults">
-        <section
-          v-for="group in filteredGroups"
-          :key="group.title"
-          class="sidebar-group"
-        >
-          <p class="sidebar-group__title">{{ group.title }}</p>
+      <section
+        v-for="group in navGroups"
+        :key="group.title"
+        class="sidebar-group"
+      >
+        <p class="sidebar-group__title">{{ group.title }}</p>
 
-          <template v-for="(item, idx) in group.items" :key="`${group.title}-${item.label}-${idx}`">
-            <RouterLink
-              v-if="item.path && !item.disabled"
-              :to="item.path"
-              class="sidebar-menu__link"
-              active-class="sidebar-menu__link--active"
-              @click="onNavClick"
-            >
-              <q-icon :name="item.icon" size="18px" class="sidebar-menu__icon" />
-              <span class="sidebar-menu__label">{{ item.label }}</span>
-            </RouterLink>
+        <template v-for="(item, idx) in group.items" :key="`${group.title}-${item.label}-${idx}`">
+          <RouterLink
+            v-if="item.path && !item.disabled"
+            :to="item.path"
+            class="sidebar-menu__link"
+            active-class="sidebar-menu__link--active"
+            @click="onNavClick"
+          >
+            <q-icon :name="item.icon" size="18px" class="sidebar-menu__icon" />
+            <span class="sidebar-menu__label">{{ item.label }}</span>
+          </RouterLink>
 
-            <span
-              v-else
-              class="sidebar-menu__link sidebar-menu__link--disabled"
-              :title="'功能開發中'"
-            >
-              <q-icon :name="item.icon" size="18px" class="sidebar-menu__icon" />
-              <span class="sidebar-menu__label">{{ item.label }}</span>
-            </span>
-          </template>
-        </section>
-      </template>
-
-      <p v-else class="sidebar-empty">找不到符合的選單</p>
+          <span
+            v-else
+            class="sidebar-menu__link sidebar-menu__link--disabled"
+            :title="'功能開發中'"
+          >
+            <q-icon :name="item.icon" size="18px" class="sidebar-menu__icon" />
+            <span class="sidebar-menu__label">{{ item.label }}</span>
+          </span>
+        </template>
+      </section>
     </nav>
   </aside>
 </template>

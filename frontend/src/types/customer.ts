@@ -20,9 +20,10 @@ export interface AptRecordListResponse {
 }
 
 export interface ApiResponse<T> {
-  code: number
-  message: string
-  data: T
+  CODE: string
+  MESSAGE: string
+  DATA: T
+  SUCCESS: boolean
 }
 
 export interface AptUpdateItem {

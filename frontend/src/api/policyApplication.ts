@@ -73,3 +73,8 @@ export async function downloadPolicyFile(path?: string | null, filename?: string
 
   triggerBlobDownload(response.data as Blob, filename?.trim() || 'document')
 }
+
+export async function fetchIncompleteApplications(): Promise<PolicyRecord[]> {
+  const response = await requestJson<PolicyRecord[]>(`${BASE}/incomplete`, 'GET')
+  return response.DATA ?? []
+}
