@@ -1,16 +1,24 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { fetchUsers, registerUser, updateUser, deleteUser, type User } from '../services/userService'
+import { computed, onMounted, ref } from 'vue'
+import { useQuasar } from 'quasar'
+import PageHero from '@/components/layout/PageHero.vue'
+import {
+  deleteUser,
+  fetchUsers,
+  registerUser,
+  updateUser,
+  type User,
+} from '@/services/userService'
 
-
-const router = useRouter()
+const $q = useQuasar()
 
 const users = ref<User[]>([])
 const loading = ref(false)
 const submitting = ref(false)
-const successMessage = ref('')
-const errorMessage = ref('')
+
+const searchQuery = ref('')
+const filterRole = ref('')
+const filterStatus = ref('')
 
 const showForm = ref(false)
 const formMode = ref<'create' | 'edit'>('create')
@@ -19,33 +27,103 @@ const form = ref({
   password: '',
   displayName: '',
   role: 'APPLICANT',
-  enabled: true
+  enabled: true,
 })
 
-// 刪除確認
 const showDeleteConfirm = ref(false)
 const deleteTarget = ref<User | null>(null)
 
-// 載入使用者清單
+const ROLE_LABEL: Record<string, string> = {
+  APPLICANT: '申請人',
+  REVIEWER: '審核人',
+}
+
+const ROLE_COLOR: Record<string, string> = {
+  APPLICANT: 'blue-6',
+  REVIEWER: 'purple-6',
+}
+
+const roleOptions = [
+  { label: '全部角色', value: '' },
+  { label: '申請人', value: 'APPLICANT' },
+  { label: '審核人', value: 'REVIEWER' },
+]
+
+const statusOptions = [
+  { label: '全部狀態', value: '' },
+  { label: '啟用', value: 'ACTIVE' },
+  { label: '停用', value: 'INACTIVE' },
+]
+
+const roleFormOptions = [
+  { label: '申請人', value: 'APPLICANT' },
+  { label: '審核人', value: 'REVIEWER' },
+]
+
+const enabledOptions = [
+  { label: '啟用', value: true },
+  { label: '停用', value: false },
+]
+
+const activeCount = computed(() => users.value.filter((u) => u.STATUS === 'ACTIVE').length)
+const inactiveCount = computed(() => users.value.filter((u) => u.STATUS !== 'ACTIVE').length)
+
+const filteredUsers = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  return users.value.filter((user) => {
+    const matchQuery =
+      !q ||
+      user.USERNAME.toLowerCase().includes(q) ||
+      user.DISPLAY_NAME.toLowerCase().includes(q)
+    const matchRole = !filterRole.value || user.ROLE_CODE === filterRole.value
+    const matchStatus = !filterStatus.value || user.STATUS === filterStatus.value
+    return matchQuery && matchRole && matchStatus
+  })
+})
+
+const columns = [
+  { name: 'user', label: '使用者', field: 'USERNAME', align: 'left' as const, sortable: true },
+  { name: 'role', label: '角色', field: 'ROLE_CODE', align: 'left' as const },
+  { name: 'status', label: '狀態', field: 'STATUS', align: 'center' as const },
+  { name: 'actions', label: '操作', field: 'actions', align: 'center' as const },
+]
+
+function roleLabel(code: string) {
+  return ROLE_LABEL[code] ?? code
+}
+
+function roleColor(code: string) {
+  return ROLE_COLOR[code] ?? 'blue-grey-5'
+}
+
+function userInitials(user: User) {
+  const name = user.DISPLAY_NAME?.trim() || user.USERNAME
+  return name.slice(0, 1).toUpperCase()
+}
+
+function resetFilter() {
+  searchQuery.value = ''
+  filterRole.value = ''
+  filterStatus.value = ''
+}
+
 async function loadUsers() {
   loading.value = true
   try {
     users.value = await fetchUsers()
   } catch {
-    errorMessage.value = '載入使用者失敗'
+    $q.notify({ type: 'negative', message: '載入使用者失敗', position: 'top' })
   } finally {
     loading.value = false
   }
 }
 
-// 開啟新增表單
 function openCreate() {
   formMode.value = 'create'
   form.value = { username: '', password: '', displayName: '', role: 'APPLICANT', enabled: true }
   showForm.value = true
 }
 
-// 開啟修改表單
 function openEdit(user: User) {
   formMode.value = 'edit'
   form.value = {
@@ -53,50 +131,57 @@ function openEdit(user: User) {
     password: '',
     displayName: user.DISPLAY_NAME,
     role: user.ROLE_CODE || 'APPLICANT',
-    enabled: user.STATUS === 'ACTIVE'
+    enabled: user.STATUS === 'ACTIVE',
   }
   showForm.value = true
 }
 
-// 關閉表單
 function closeForm() {
   showForm.value = false
 }
 
-// 送出表單
 async function handleSubmit() {
-  submitting.value = true
-  successMessage.value = ''
-  errorMessage.value = ''
+  if (!form.value.username.trim()) {
+    $q.notify({ type: 'warning', message: '請輸入帳號', position: 'top' })
+    return
+  }
+  if (formMode.value === 'create' && !form.value.password.trim()) {
+    $q.notify({ type: 'warning', message: '請輸入密碼', position: 'top' })
+    return
+  }
 
+  submitting.value = true
   try {
     if (formMode.value === 'create') {
       await registerUser({
         USERNAME: form.value.username,
         PASSWORD: form.value.password,
-        DISPLAY_NAME: form.value.displayName || form.value.username
+        DISPLAY_NAME: form.value.displayName || form.value.username,
       })
-      successMessage.value = `使用者 ${form.value.username} 新增成功`
+      $q.notify({ type: 'positive', message: `使用者 ${form.value.username} 新增成功` })
     } else {
       await updateUser(form.value.username, {
         PASSWORD: form.value.password,
         DISPLAY_NAME: form.value.displayName,
         STATUS: form.value.enabled ? 'ACTIVE' : 'INACTIVE',
-        ROLE: form.value.role
+        ROLE: form.value.role,
       })
-      successMessage.value = `使用者 ${form.value.username} 修改成功`
+      $q.notify({ type: 'positive', message: `使用者 ${form.value.username} 修改成功` })
     }
     closeForm()
     await loadUsers()
-  } catch (error: any) {
-    const data = error.response?.data
-    errorMessage.value = data?.MESSAGE ?? data?.message ?? '操作失敗'
+  } catch (error: unknown) {
+    const data = (error as { response?: { data?: { MESSAGE?: string; message?: string } } })?.response?.data
+    $q.notify({
+      type: 'negative',
+      message: data?.MESSAGE ?? data?.message ?? '操作失敗',
+      position: 'top',
+    })
   } finally {
     submitting.value = false
   }
 }
 
-// 停用/啟用使用者
 async function toggleUser(user: User) {
   try {
     const newStatus = user.STATUS === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
@@ -104,43 +189,49 @@ async function toggleUser(user: User) {
       PASSWORD: '',
       DISPLAY_NAME: user.DISPLAY_NAME,
       STATUS: newStatus,
-      ROLE: user.ROLE_CODE || 'APPLICANT'
+      ROLE: user.ROLE_CODE || 'APPLICANT',
     })
     await loadUsers()
-    successMessage.value = `使用者 ${user.USERNAME} 已${newStatus === 'ACTIVE' ? '啟用' : '停用'}`
-  } catch (error: any) {
-    const data = error.response?.data
-    errorMessage.value = data?.MESSAGE ?? data?.message ?? '操作失敗'
+    $q.notify({
+      type: newStatus === 'ACTIVE' ? 'positive' : 'warning',
+      message: `使用者 ${user.USERNAME} 已${newStatus === 'ACTIVE' ? '啟用' : '停用'}`,
+    })
+  } catch (error: unknown) {
+    const data = (error as { response?: { data?: { MESSAGE?: string; message?: string } } })?.response?.data
+    $q.notify({
+      type: 'negative',
+      message: data?.MESSAGE ?? data?.message ?? '操作失敗',
+      position: 'top',
+    })
   }
 }
 
-// 開啟刪除確認
 function openDeleteConfirm(user: User) {
   deleteTarget.value = user
   showDeleteConfirm.value = true
 }
 
-// 取消刪除
 function cancelDelete() {
   deleteTarget.value = null
   showDeleteConfirm.value = false
 }
 
-// 確認刪除
 async function confirmDelete() {
   if (!deleteTarget.value) return
   submitting.value = true
-  successMessage.value = ''
-  errorMessage.value = ''
   try {
     await deleteUser(deleteTarget.value.USERNAME)
-    successMessage.value = `使用者 ${deleteTarget.value.USERNAME} 已刪除`
+    $q.notify({ type: 'positive', message: `使用者 ${deleteTarget.value.USERNAME} 已刪除` })
     showDeleteConfirm.value = false
     deleteTarget.value = null
     await loadUsers()
-  } catch (error: any) {
-    const data = error.response?.data
-    errorMessage.value = data?.MESSAGE ?? data?.message ?? '刪除失敗'
+  } catch (error: unknown) {
+    const data = (error as { response?: { data?: { MESSAGE?: string; message?: string } } })?.response?.data
+    $q.notify({
+      type: 'negative',
+      message: data?.MESSAGE ?? data?.message ?? '刪除失敗',
+      position: 'top',
+    })
   } finally {
     submitting.value = false
   }
@@ -152,432 +243,448 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="page-shell">
-    <!-- Header -->
-    <header class="hero-panel">
-      <div>
-        <p class="eyebrow">USER_MGMT</p>
-        <h1>使用者管理</h1>
-        <p class="hero-copy">管理系統使用者帳號、角色與啟用狀態。</p>
-      </div>
-      <div class="hero-side-card">
-        <h2>操作說明</h2>
-        <p>只有 REVIEWER 可以新增、修改、停用使用者。</p>
-        <button class="link-button" @click="router.push('/dashboard')">
-          返回工作台
-        </button>
-      </div>
-    </header>
+  <section class="page-with-hero users-page">
+    <PageHero
+      title="使用者管理"
+      subtitle="管理系統使用者帳號、角色與啟用狀態"
+      compact
+    />
 
-    <AuthCard />
+    <div class="page-body">
+      <!-- 篩選 -->
+      <q-card flat class="page-card page-card--filter q-mb-md">
+        <q-card-section>
+          <div class="page-card__header q-mb-sm">
+            <div>
+              <p class="page-card__kicker">USER FILTER</p>
+              <div class="page-card__title">查詢條件</div>
+              <p class="page-card__desc">可依帳號、顯示名稱、角色或狀態篩選</p>
+            </div>
+          </div>
 
-    <!-- 全域訊息 -->
-    <section class="status-strip">
-      <div v-if="successMessage" class="message-box">{{ successMessage }}</div>
-      <div v-if="errorMessage" class="message-box error">{{ errorMessage }}</div>
-    </section>
+          <div class="users-filter-grid q-mt-md">
+            <q-input
+              v-model="searchQuery"
+              label="關鍵字搜尋"
+              outlined
+              dense
+              clearable
+              placeholder="帳號或顯示名稱"
+            >
+              <template #prepend>
+                <q-icon name="search" />
+              </template>
+            </q-input>
+            <q-select
+              v-model="filterRole"
+              :options="roleOptions"
+              label="角色"
+              outlined
+              dense
+              emit-value
+              map-options
+            />
+            <q-select
+              v-model="filterStatus"
+              :options="statusOptions"
+              label="狀態"
+              outlined
+              dense
+              emit-value
+              map-options
+            />
+          </div>
 
-    <!-- 使用者清單 -->
-    <section class="content-card">
-      <div class="panel-header">
-        <div>
-          <p class="panel-kicker">使用者清單</p>
-          <h2>所有使用者</h2>
-        </div>
-        <button class="primary-button" @click="openCreate">新增使用者</button>
-      </div>
+          <div class="q-mt-md row items-center wrap q-gutter-sm">
+            <q-btn
+              color="primary"
+              unelevated
+              label="執行查詢"
+              no-caps
+              icon="search"
+              :loading="loading"
+              @click="loadUsers"
+            />
+            <q-btn
+              outline
+              color="primary"
+              label="清空條件"
+              no-caps
+              icon="refresh"
+              @click="resetFilter"
+            />
+          </div>
+        </q-card-section>
+      </q-card>
 
-      <!-- 載入中 -->
-      <div v-if="loading" class="empty-row">載入中...</div>
+      <!-- 使用者清單 -->
+      <q-card flat class="page-card page-card--data">
+        <q-card-section>
+          <div class="page-card__header q-mb-md">
+            <div>
+              <p class="page-card__kicker">USER LIST</p>
+              <div class="page-card__title">使用者清單</div>
+              <p class="page-card__desc">
+                共 {{ filteredUsers.length }} 筆結果
+                <span v-if="filteredUsers.length !== users.length">（全部 {{ users.length }} 筆）</span>
+              </p>
+            </div>
+            <div class="users-toolbar">
+              <div class="users-stats" aria-label="使用者狀態統計">
+                <q-chip dense size="sm" color="positive" text-color="white" icon="check_circle">
+                  啟用 {{ activeCount }}
+                </q-chip>
+                <q-chip dense size="sm" color="grey-5" text-color="white" icon="pause_circle">
+                  停用 {{ inactiveCount }}
+                </q-chip>
+              </div>
+              <q-btn
+                color="primary"
+                unelevated
+                icon="person_add"
+                label="新增使用者"
+                no-caps
+                @click="openCreate"
+              />
+            </div>
+          </div>
 
-      <!-- 表格 -->
-      <div v-else class="table-shell">
-        <table class="result-table">
-          <thead>
-            <tr>
-              <th>帳號</th>
-              <th>顯示名稱</th>
-              <th>角色</th>
-              <th>狀態</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="!users.length">
-              <td colspan="5" class="empty-row">查無使用者</td>
-            </tr>
-            <tr v-for="user in users" :key="user.USERNAME">
-              <td>{{ user.USERNAME }}</td>
-              <td>{{ user.DISPLAY_NAME }}</td>
-              <td>
-                <span class="role-pill">{{ user.ROLE_CODE }}</span>
-              </td>
-              <td>
-                <span :class="user.STATUS === 'ACTIVE' ? 'badge-success' : 'badge-error'">
-                  {{ user.STATUS === 'ACTIVE' ? '啟用' : '停用' }}
-                </span>
-              </td>
-              <td>
-                <div class="inline-actions">
-                  <button class="action-button" @click="openEdit(user)">修改</button>
-                  <button class="action-button" @click="toggleUser(user)">
-                    {{ user.STATUS === 'ACTIVE' ? '停用' : '啟用' }}
-                  </button>
+          <q-table
+            class="app-table users-table"
+            :rows="filteredUsers"
+            :columns="columns"
+            row-key="USERNAME"
+            flat
+            bordered
+            dense
+            :loading="loading"
+            hide-pagination
+            :rows-per-page-options="[0]"
+            no-data-label="查無符合條件的使用者"
+          >
+            <template #body-cell-user="props">
+              <q-td :props="props">
+                <div class="user-cell">
+                  <q-avatar
+                    size="36px"
+                    :color="props.row.STATUS === 'ACTIVE' ? 'primary' : 'grey-5'"
+                    text-color="white"
+                  >
+                    {{ userInitials(props.row) }}
+                  </q-avatar>
+                  <div class="user-cell__info">
+                    <span class="user-cell__name">{{ props.row.DISPLAY_NAME }}</span>
+                    <span class="user-cell__username">@{{ props.row.USERNAME }}</span>
+                  </div>
                 </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+              </q-td>
+            </template>
 
-    <!-- 刪除確認區塊 -->
-    <section v-if="showDeleteConfirm" class="content-card confirm-card">
-      <p class="confirm-title">⚠️ 確認刪除</p>
-      <p class="confirm-body">
-        確定要刪除使用者 <strong>{{ deleteTarget?.USERNAME }}</strong> 嗎？此操作無法復原。
-      </p>
-      <div class="action-row">
-        <button class="danger-button" @click="confirmDelete" :disabled="submitting">
-          {{ submitting ? '刪除中...' : '確認刪除' }}
-        </button>
-        <button class="ghost-button" @click="cancelDelete">取消</button>
-      </div>
-    </section>
+            <template #body-cell-role="props">
+              <q-td :props="props">
+                <q-chip
+                  dense
+                  size="sm"
+                  :color="roleColor(props.row.ROLE_CODE)"
+                  text-color="white"
+                  :icon="props.row.ROLE_CODE === 'REVIEWER' ? 'verified_user' : 'person'"
+                >
+                  {{ roleLabel(props.row.ROLE_CODE) }}
+                </q-chip>
+              </q-td>
+            </template>
 
-    <!-- 新增/修改表單 -->
-    <section v-if="showForm" class="content-card">
-      <div class="panel-header">
-        <div>
-          <p class="panel-kicker">{{ formMode === 'create' ? '新增' : '修改' }}</p>
-          <h2>{{ formMode === 'create' ? '新增使用者' : `修改 ${form.username}` }}</h2>
-        </div>
-        <button class="ghost-button" @click="closeForm">取消</button>
-      </div>
+            <template #body-cell-status="props">
+              <q-td :props="props">
+                <q-badge
+                  :color="props.row.STATUS === 'ACTIVE' ? 'positive' : 'grey-5'"
+                  :label="props.row.STATUS === 'ACTIVE' ? '啟用' : '停用'"
+                />
+              </q-td>
+            </template>
 
-      <div class="form-grid">
-        <label>
-          帳號
-          <input
-            v-model="form.username"
-            type="text"
-            :disabled="formMode === 'edit'"
-            required
+            <template #body-cell-actions="props">
+              <q-td :props="props">
+                <div class="users-actions">
+                  <q-btn
+                    size="sm"
+                    flat
+                    dense
+                    no-caps
+                    color="primary"
+                    icon="edit"
+                    label="修改"
+                    @click="openEdit(props.row)"
+                  />
+                  <q-btn
+                    size="sm"
+                    flat
+                    dense
+                    no-caps
+                    :color="props.row.STATUS === 'ACTIVE' ? 'grey-7' : 'positive'"
+                    :icon="props.row.STATUS === 'ACTIVE' ? 'block' : 'check_circle'"
+                    :label="props.row.STATUS === 'ACTIVE' ? '停用' : '啟用'"
+                    @click="toggleUser(props.row)"
+                  />
+                  <q-btn
+                    size="sm"
+                    flat
+                    dense
+                    no-caps
+                    color="negative"
+                    icon="delete_outline"
+                    label="刪除"
+                    @click="openDeleteConfirm(props.row)"
+                  />
+                </div>
+              </q-td>
+            </template>
+
+            <template #no-data>
+              <div class="users-empty">
+                <q-icon name="group_off" size="40px" color="grey-5" />
+                <p>查無符合條件的使用者</p>
+                <q-btn
+                  outline
+                  color="primary"
+                  label="新增第一位使用者"
+                  no-caps
+                  icon="person_add"
+                  @click="openCreate"
+                />
+              </div>
+            </template>
+          </q-table>
+        </q-card-section>
+      </q-card>
+    </div>
+
+    <!-- 新增 / 修改 Dialog -->
+    <q-dialog v-model="showForm" persistent>
+      <q-card class="users-dialog">
+        <q-card-section class="users-dialog__header">
+          <div>
+            <p class="users-dialog__kicker">
+              {{ formMode === 'create' ? 'NEW USER' : 'EDIT USER' }}
+            </p>
+            <div class="text-h6">
+              {{ formMode === 'create' ? '新增使用者' : `修改 ${form.username}` }}
+            </div>
+            <p class="users-dialog__desc">
+              {{
+                formMode === 'create'
+                  ? '建立新帳號後即可登入系統使用對應功能'
+                  : '更新帳號資料，密碼留空則不變更'
+              }}
+            </p>
+          </div>
+          <q-btn icon="close" flat round dense v-close-popup aria-label="關閉" @click="closeForm" />
+        </q-card-section>
+
+        <q-separator />
+
+        <q-card-section class="users-dialog__body">
+          <p class="page-form-section__title">帳號資料</p>
+          <div class="page-form-grid">
+            <q-input
+              v-model="form.username"
+              label="帳號 *"
+              dense
+              outlined
+              stack-label
+              :readonly="formMode === 'edit'"
+              :bg-color="formMode === 'edit' ? 'grey-2' : undefined"
+              hint="建立後不可修改"
+            />
+            <q-input
+              v-model="form.password"
+              label="密碼"
+              dense
+              outlined
+              stack-label
+              type="password"
+              :hint="formMode === 'edit' ? '不填則不修改密碼' : '新增時必填'"
+            />
+            <q-input
+              v-model="form.displayName"
+              label="顯示名稱"
+              dense
+              outlined
+              stack-label
+              placeholder="預設與帳號相同"
+            />
+            <q-select
+              v-model="form.role"
+              :options="roleFormOptions"
+              label="角色"
+              dense
+              outlined
+              emit-value
+              map-options
+            />
+            <q-select
+              v-if="formMode === 'edit'"
+              v-model="form.enabled"
+              :options="enabledOptions"
+              label="狀態"
+              dense
+              outlined
+              emit-value
+              map-options
+            />
+          </div>
+        </q-card-section>
+
+        <q-separator />
+
+        <q-card-actions align="right" class="q-pa-md">
+          <q-btn flat label="取消" no-caps :disable="submitting" @click="closeForm" />
+          <q-btn
+            color="primary"
+            unelevated
+            :label="submitting ? '處理中...' : '確認送出'"
+            no-caps
+            :loading="submitting"
+            @click="handleSubmit"
           />
-        </label>
-        <label>
-          密碼
-          <input
-            v-model="form.password"
-            type="password"
-            :placeholder="formMode === 'edit' ? '不填則不修改密碼' : ''"
-          />
-        </label>
-        <label>
-          顯示名稱
-          <input v-model="form.displayName" type="text" />
-        </label>
-        <label>
-          角色
-          <select v-model="form.role">
-            <option value="APPLICANT">APPLICANT</option>
-            <option value="REVIEWER">REVIEWER</option>
-          </select>
-        </label>
-        <label v-if="formMode === 'edit'">
-          狀態
-          <select v-model="form.enabled">
-            <option :value="true">啟用</option>
-            <option :value="false">停用</option>
-          </select>
-        </label>
-      </div>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
 
-      <div class="action-row">
-        <button class="primary-button" @click="handleSubmit" :disabled="submitting">
-          {{ submitting ? '處理中...' : '送出' }}
-        </button>
-        <button class="ghost-button" @click="closeForm">取消</button>
-      </div>
-    </section>
-  </div>
+    <!-- 刪除確認 Dialog -->
+    <q-dialog v-model="showDeleteConfirm" persistent>
+      <q-card class="users-dialog users-dialog--danger">
+        <q-card-section class="row items-center q-gutter-sm">
+          <q-avatar icon="warning" color="negative" text-color="white" />
+          <div>
+            <div class="text-h6">確認刪除</div>
+            <p class="users-dialog__desc q-mb-none">
+              確定要刪除使用者
+              <strong>{{ deleteTarget?.DISPLAY_NAME }}（{{ deleteTarget?.USERNAME }}）</strong>
+              嗎？此操作無法復原。
+            </p>
+          </div>
+        </q-card-section>
+
+        <q-card-actions align="right" class="q-pa-md">
+          <q-btn flat label="取消" no-caps :disable="submitting" @click="cancelDelete" />
+          <q-btn
+            color="negative"
+            unelevated
+            :label="submitting ? '刪除中...' : '確認刪除'"
+            no-caps
+            :loading="submitting"
+            @click="confirmDelete"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+  </section>
 </template>
 
 <style scoped>
-.page-shell {
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 32px 24px 48px;
+.users-filter-grid {
   display: grid;
-  gap: 20px;
-}
-
-.hero-panel {
-  display: grid;
-  grid-template-columns: 1.8fr 1fr;
-  gap: 24px;
-  padding: 28px;
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 24px 80px rgba(38, 57, 77, 0.12);
-}
-
-.eyebrow, .panel-kicker {
-  margin: 0 0 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  color: #876445;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.hero-panel h1 {
-  margin: 0;
-  font-family: "Noto Serif TC", serif;
-  font-size: 32px;       /* 瀏覽器原生 h1 = 2em = 32px */
-  line-height: 1.2;
-  font-weight: bold;
-}
-
-.content-card h2,
-.hero-side-card h2 {
-  margin: 0;
-  font-family: "Noto Serif TC", serif;
-  font-size: 24px;       /* 瀏覽器原生 h2 = 1.5em = 24px */
-  line-height: 1.3;
-  font-weight: bold;
-}
-
-.hero-copy {
-  line-height: 1.75;
-}
-
-.hero-side-card {
-  padding: 22px;
-  border-radius: 20px;
-  background: linear-gradient(180deg, #172b4d 0%, #10203a 100%);
-  color: #f9f5ef;
-}
-
-.hero-side-card h2 {
-  margin: 0 0 12px;
-  font-family: "Noto Serif TC", serif;
-  color: #f9f5ef;
-}
-
-.hero-side-card p {
-  line-height: 1.75;
-  margin: 0 0 12px;
-}
-
-.link-button {
-  background: none;
-  border: none;
-  color: #f6c177;
-  cursor: pointer;
-  font-weight: 700;
-  padding: 0;
-  text-decoration: underline;
-}
-
-.status-strip {
-  display: grid;
-  gap: 8px;
-}
-
-.message-box {
-  padding: 14px 16px;
-  border-radius: 14px;
-  background: #e6f6ee;
-  color: #1b6e4b;
-}
-
-.message-box.error {
-  background: #ffe7e5;
-  color: #a63934;
-}
-
-.content-card {
-  padding: 28px;
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: 0 18px 50px rgba(45, 62, 80, 0.08);
-  display: grid;
-  gap: 20px;
-}
-
-/* 刪除確認卡片 */
-.confirm-card {
-  border: 2px solid #fbbcba;
-  background: #fff8f8;
-}
-
-.confirm-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #a63934;
-  margin: 0;
-}
-
-.confirm-body {
-  margin: 0;
-  line-height: 1.75;
-  color: #3d3d3d;
-}
-
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.table-shell {
-  overflow-x: auto;
-}
-
-.result-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.result-table th,
-.result-table td {
-  padding: 12px 10px;
-  border-bottom: 1px solid #eceff3;
-  text-align: left;
-}
-
-.empty-row {
-  text-align: center;
-  color: #62707c;
-  padding: 20px;
-}
-
-.role-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: #e8f0f8;
-  color: #1f4b63;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.badge-success {
-  color: #1b6e4b;
-  font-weight: 700;
-}
-
-.badge-error {
-  color: #a63934;
-  font-weight: 700;
-}
-
-.inline-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.action-button {
-  padding: 8px 10px;
-  border: 0;
-  border-radius: 10px;
-  cursor: pointer;
-  background: #edf2f7;
-  font-weight: 600;
-}
-
-/* 刪除按鈕 */
-.action-button.danger {
-  background: #ffe7e5;
-  color: #a63934;
-}
-
-.action-button.danger:hover {
-  background: #fbbcba;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: 2fr 1fr 1fr;
   gap: 16px;
 }
 
-label {
-  display: grid;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-input, select {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 12px 14px;
-  border-radius: 14px;
-  border: 1px solid #d7d9de;
-  background: #fff;
-  font: inherit;
-}
-
-input:disabled {
-  background: #f3f5f7;
-  color: #7b8794;
-}
-
-.action-row {
+.users-toolbar {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
-.primary-button {
-  padding: 12px 18px;
-  background: linear-gradient(135deg, #0d6b77 0%, #144e68 100%);
-  color: #fff;
-  border: 0;
-  border-radius: 999px;
-  font-weight: 700;
-  cursor: pointer;
+.users-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.primary-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-/* 紅色確認刪除按鈕 */
-.danger-button {
-  padding: 12px 18px;
-  background: linear-gradient(135deg, #c0392b 0%, #922b21 100%);
-  color: #fff;
-  border: 0;
-  border-radius: 999px;
-  font-weight: 700;
-  cursor: pointer;
+.user-cell__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
-.danger-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
+.user-cell__name {
+  font-weight: 600;
+  color: var(--notus-charcoal, #1a202c);
+  line-height: 1.3;
 }
 
-.ghost-button {
-  padding: 10px 16px;
-  background: #f2e9d8;
-  color: #6e4d2f;
-  border: 0;
-  border-radius: 999px;
-  font-weight: 700;
-  cursor: pointer;
+.user-cell__username {
+  font-size: 0.8rem;
+  color: var(--notus-muted, #718096);
 }
 
-@media (max-width: 1100px) {
-  .hero-panel {
+.users-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.users-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 32px 16px;
+  color: var(--notus-muted, #718096);
+}
+
+.users-empty p {
+  margin: 0;
+}
+
+.users-dialog {
+  width: min(520px, 92vw);
+}
+
+.users-dialog--danger {
+  width: min(440px, 92vw);
+}
+
+.users-dialog__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.users-dialog__kicker {
+  margin: 0 0 4px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--notus-green-dark, #38a169);
+}
+
+.users-dialog__desc {
+  margin: 6px 0 0;
+  font-size: 0.875rem;
+  color: var(--notus-muted, #718096);
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .users-filter-grid {
     grid-template-columns: 1fr;
   }
-  .form-grid {
-    grid-template-columns: 1fr;
+
+  .users-toolbar {
+    width: 100%;
+    justify-content: space-between;
   }
 }
 </style>
