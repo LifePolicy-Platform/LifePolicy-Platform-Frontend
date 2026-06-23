@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { fetchUsers, registerUser, updateUser, deleteUser, type User } from '../services/userService'
-
 
 const router = useRouter()
 
@@ -22,9 +21,22 @@ const form = ref({
   enabled: true
 })
 
-// 刪除確認
-const showDeleteConfirm = ref(false)
-const deleteTarget = ref<User | null>(null)
+// 統一確認彈窗
+type ModalType = 'warn' | 'active' | 'danger'
+const confirmModal = reactive({
+  show: false,
+  type: 'warn' as ModalType,
+  title: '',
+  message: '',
+  confirmLabel: '',
+  onConfirm: () => {},
+})
+const confirmTarget = ref<User | null>(null)
+
+function closeConfirmModal() {
+  confirmModal.show = false
+  confirmTarget.value = null
+}
 
 // 載入使用者清單
 async function loadUsers() {
@@ -58,12 +70,10 @@ function openEdit(user: User) {
   showForm.value = true
 }
 
-// 關閉表單
 function closeForm() {
   showForm.value = false
 }
 
-// 送出表單
 async function handleSubmit() {
   submitting.value = true
   successMessage.value = ''
@@ -114,36 +124,67 @@ async function toggleUser(user: User) {
   }
 }
 
-// 開啟刪除確認
+// 開啟停用確認彈窗
+function openDeactivateConfirm(user: User) {
+  confirmTarget.value = user
+  Object.assign(confirmModal, {
+    show: true,
+    type: 'warn',
+    title: '確認停用',
+    message: `確定要停用使用者 ${user.USERNAME} 嗎？停用後該帳號將無法登入系統。`,
+    confirmLabel: '確認停用',
+    onConfirm: async () => {
+      if (!confirmTarget.value) return
+      await toggleUser(confirmTarget.value)
+      closeConfirmModal()
+    },
+  })
+}
+
+// 開啟啟用確認彈窗
+function openActivateConfirm(user: User) {
+  confirmTarget.value = user
+  Object.assign(confirmModal, {
+    show: true,
+    type: 'active',
+    title: '確認啟用',
+    message: `確定要啟用使用者 ${user.USERNAME} 嗎？啟用後該帳號可以登入系統。`,
+    confirmLabel: '確認啟用',
+    onConfirm: async () => {
+      if (!confirmTarget.value) return
+      await toggleUser(confirmTarget.value)
+      closeConfirmModal()
+    },
+  })
+}
+
+// 開啟刪除確認彈窗
 function openDeleteConfirm(user: User) {
-  deleteTarget.value = user
-  showDeleteConfirm.value = true
-}
-
-// 取消刪除
-function cancelDelete() {
-  deleteTarget.value = null
-  showDeleteConfirm.value = false
-}
-
-// 確認刪除
-async function confirmDelete() {
-  if (!deleteTarget.value) return
-  submitting.value = true
-  successMessage.value = ''
-  errorMessage.value = ''
-  try {
-    await deleteUser(deleteTarget.value.USERNAME)
-    successMessage.value = `使用者 ${deleteTarget.value.USERNAME} 已刪除`
-    showDeleteConfirm.value = false
-    deleteTarget.value = null
-    await loadUsers()
-  } catch (error: any) {
-    const data = error.response?.data
-    errorMessage.value = data?.MESSAGE ?? data?.message ?? '刪除失敗'
-  } finally {
-    submitting.value = false
-  }
+  confirmTarget.value = user
+  Object.assign(confirmModal, {
+    show: true,
+    type: 'danger',
+    title: '確認刪除',
+    message: `確定要刪除使用者 ${user.USERNAME} 嗎？此操作無法復原。`,
+    confirmLabel: '確認刪除',
+    onConfirm: async () => {
+      if (!confirmTarget.value) return
+      submitting.value = true
+      successMessage.value = ''
+      errorMessage.value = ''
+      try {
+        await deleteUser(confirmTarget.value.USERNAME)
+        successMessage.value = `使用者 ${confirmTarget.value.USERNAME} 已刪除`
+        closeConfirmModal()
+        await loadUsers()
+      } catch (error: any) {
+        const data = error.response?.data
+        errorMessage.value = data?.MESSAGE ?? data?.message ?? '刪除失敗'
+      } finally {
+        submitting.value = false
+      }
+    },
+  })
 }
 
 onMounted(() => {
@@ -169,8 +210,6 @@ onMounted(() => {
       </div>
     </header>
 
-    <AuthCard />
-
     <!-- 全域訊息 -->
     <section class="status-strip">
       <div v-if="successMessage" class="message-box">{{ successMessage }}</div>
@@ -187,10 +226,8 @@ onMounted(() => {
         <button class="primary-button" @click="openCreate">新增使用者</button>
       </div>
 
-      <!-- 載入中 -->
       <div v-if="loading" class="empty-row">載入中...</div>
 
-      <!-- 表格 -->
       <div v-else class="table-shell">
         <table class="result-table">
           <thead>
@@ -220,28 +257,21 @@ onMounted(() => {
               <td>
                 <div class="inline-actions">
                   <button class="action-button" @click="openEdit(user)">修改</button>
-                  <button class="action-button" @click="toggleUser(user)">
-                    {{ user.STATUS === 'ACTIVE' ? '停用' : '啟用' }}
-                  </button>
+                  <button
+                    v-if="user.STATUS === 'ACTIVE'"
+                    class="action-button action-button--warn"
+                    @click="openDeactivateConfirm(user)"
+                  >停用</button>
+                  <button
+                    v-else
+                    class="action-button action-button--active"
+                    @click="openActivateConfirm(user)"
+                  >啟用</button>
                 </div>
               </td>
             </tr>
           </tbody>
         </table>
-      </div>
-    </section>
-
-    <!-- 刪除確認區塊 -->
-    <section v-if="showDeleteConfirm" class="content-card confirm-card">
-      <p class="confirm-title">⚠️ 確認刪除</p>
-      <p class="confirm-body">
-        確定要刪除使用者 <strong>{{ deleteTarget?.USERNAME }}</strong> 嗎？此操作無法復原。
-      </p>
-      <div class="action-row">
-        <button class="danger-button" @click="confirmDelete" :disabled="submitting">
-          {{ submitting ? '刪除中...' : '確認刪除' }}
-        </button>
-        <button class="ghost-button" @click="cancelDelete">取消</button>
       </div>
     </section>
 
@@ -301,6 +331,40 @@ onMounted(() => {
       </div>
     </section>
   </div>
+
+  <!-- 確認彈窗 -->
+  <Teleport to="body">
+    <Transition name="modal">
+      <div v-if="confirmModal.show" class="modal-backdrop" @click.self="closeConfirmModal">
+        <div class="modal-card" :class="`modal-card--${confirmModal.type}`">
+          <div class="modal-header">
+            <span class="modal-icon">
+              <template v-if="confirmModal.type === 'warn'"></template>
+              <template v-else-if="confirmModal.type === 'active'"></template>
+              <template v-else></template>
+            </span>
+            <p class="modal-title" :class="`modal-title--${confirmModal.type}`">
+              {{ confirmModal.title }}
+            </p>
+          </div>
+          <p class="modal-body">{{ confirmModal.message }}</p>
+          <div class="modal-actions">
+            <button
+              class="modal-confirm-btn"
+              :class="`modal-confirm-btn--${confirmModal.type}`"
+              :disabled="submitting"
+              @click="confirmModal.onConfirm"
+            >
+              {{ submitting ? '處理中...' : confirmModal.confirmLabel }}
+            </button>
+            <button class="ghost-button" :disabled="submitting" @click="closeConfirmModal">
+              取消
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -334,7 +398,7 @@ onMounted(() => {
 .hero-panel h1 {
   margin: 0;
   font-family: "Noto Serif TC", serif;
-  font-size: 32px;       /* 瀏覽器原生 h1 = 2em = 32px */
+  font-size: 32px;
   line-height: 1.2;
   font-weight: bold;
 }
@@ -343,7 +407,7 @@ onMounted(() => {
 .hero-side-card h2 {
   margin: 0;
   font-family: "Noto Serif TC", serif;
-  font-size: 24px;       /* 瀏覽器原生 h2 = 1.5em = 24px */
+  font-size: 24px;
   line-height: 1.3;
   font-weight: bold;
 }
@@ -404,25 +468,6 @@ onMounted(() => {
   box-shadow: 0 18px 50px rgba(45, 62, 80, 0.08);
   display: grid;
   gap: 20px;
-}
-
-/* 刪除確認卡片 */
-.confirm-card {
-  border: 2px solid #fbbcba;
-  background: #fff8f8;
-}
-
-.confirm-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #a63934;
-  margin: 0;
-}
-
-.confirm-body {
-  margin: 0;
-  line-height: 1.75;
-  color: #3d3d3d;
 }
 
 .panel-header {
@@ -488,13 +533,27 @@ onMounted(() => {
   font-weight: 600;
 }
 
-/* 刪除按鈕 */
-.action-button.danger {
+.action-button--warn {
+  background: #fff3e0;
+  color: #b45309;
+}
+.action-button--warn:hover {
+  background: #ffe0b2;
+}
+
+.action-button--active {
+  background: #d1fae5;
+  color: #065f46;
+}
+.action-button--active:hover {
+  background: #a7f3d0;
+}
+
+.action-button--danger {
   background: #ffe7e5;
   color: #a63934;
 }
-
-.action-button.danger:hover {
+.action-button--danger:hover {
   background: #fbbcba;
 }
 
@@ -540,24 +599,7 @@ input:disabled {
   font-weight: 700;
   cursor: pointer;
 }
-
 .primary-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-/* 紅色確認刪除按鈕 */
-.danger-button {
-  padding: 12px 18px;
-  background: linear-gradient(135deg, #c0392b 0%, #922b21 100%);
-  color: #fff;
-  border: 0;
-  border-radius: 999px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.danger-button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
 }
@@ -570,6 +612,106 @@ input:disabled {
   border-radius: 999px;
   font-weight: 700;
   cursor: pointer;
+}
+.ghost-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* ── 確認彈窗 ── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9000;
+  padding: 16px;
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 420px;
+  background: #fff;
+  border-radius: 20px;
+  padding: 28px 32px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
+  display: grid;
+  gap: 16px;
+}
+
+.modal-card--warn  { border-top: 4px solid #f59e0b; }
+.modal-card--active { border-top: 4px solid #10b981; }
+.modal-card--danger { border-top: 4px solid #ef4444; }
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+.modal-title--warn   { color: #b45309; }
+.modal-title--active { color: #065f46; }
+.modal-title--danger { color: #a63934; }
+
+.modal-body {
+  margin: 0;
+  line-height: 1.75;
+  color: #3d3d3d;
+  font-size: 14px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.modal-confirm-btn {
+  padding: 10px 20px;
+  border: 0;
+  border-radius: 999px;
+  font-weight: 700;
+  cursor: pointer;
+  color: #fff;
+}
+.modal-confirm-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.modal-confirm-btn--warn   { background: linear-gradient(135deg, #d97706 0%, #b45309 100%); }
+.modal-confirm-btn--active { background: linear-gradient(135deg, #059669 0%, #047857 100%); }
+.modal-confirm-btn--danger { background: linear-gradient(135deg, #c0392b 0%, #922b21 100%); }
+
+/* 進出場動畫 */
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.18s ease;
+}
+.modal-enter-active .modal-card,
+.modal-leave-active .modal-card {
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+.modal-enter-from .modal-card,
+.modal-leave-to .modal-card {
+  transform: translateY(-12px) scale(0.97);
+  opacity: 0;
 }
 
 @media (max-width: 1100px) {

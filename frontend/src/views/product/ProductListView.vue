@@ -31,6 +31,62 @@ const isEditing = ref(false)
 const dialogLoading = ref(false)
 const dialogError = ref('')
 
+const fieldErrors = reactive({
+  productCode: '',
+  productName: '',
+  productType: '',
+  basePremium: '',
+  minAmount: '',
+  maxAmount: '',
+  minAge: '',
+  maxAge: '',
+})
+
+function clearFieldErrors() {
+  Object.assign(fieldErrors, {
+    productCode: '', productName: '', productType: '',
+    basePremium: '', minAmount: '', maxAmount: '', minAge: '', maxAge: '',
+  })
+}
+
+function validate(): boolean {
+  clearFieldErrors()
+  let ok = true
+
+  if (!isEditing.value && !form.productCode.trim()) {
+    fieldErrors.productCode = '必填'; ok = false
+  }
+  if (!form.productName.trim()) {
+    fieldErrors.productName = '必填'; ok = false
+  }
+  if (!form.productType) {
+    fieldErrors.productType = '必填'; ok = false
+  }
+  if (form.basePremium == null || form.basePremium <= 0) {
+    fieldErrors.basePremium = '需大於 0'; ok = false
+  }
+  if (form.minAmount == null || form.minAmount < 1) {
+    fieldErrors.minAmount = '需大於等於 1'; ok = false
+  }
+  if (form.maxAmount == null || form.maxAmount < 1) {
+    fieldErrors.maxAmount = '需大於等於 1'; ok = false
+  }
+  if (form.minAmount != null && form.maxAmount != null && form.minAmount > form.maxAmount) {
+    fieldErrors.minAmount = '不可大於最高保額'; fieldErrors.maxAmount = '不可小於最低保額'; ok = false
+  }
+  if (form.minAge == null || form.minAge < 0 || form.minAge > 99) {
+    fieldErrors.minAge = '需介於 0~99'; ok = false
+  }
+  if (form.maxAge == null || form.maxAge < 0 || form.maxAge > 99) {
+    fieldErrors.maxAge = '需介於 0~99'; ok = false
+  }
+  if (form.minAge != null && form.maxAge != null && form.minAge > form.maxAge) {
+    fieldErrors.minAge = '不可大於最高年齡'; fieldErrors.maxAge = '不可小於最低年齡'; ok = false
+  }
+
+  return ok
+}
+
 interface FormState {
   productCode: string
   productName: string
@@ -65,6 +121,7 @@ function openCreate() {
   Object.assign(form, emptyForm())
   isEditing.value = false
   dialogError.value = ''
+  clearFieldErrors()
   dialogOpen.value = true
 }
 
@@ -81,10 +138,12 @@ function openEdit(row: ProductListItem) {
   form.remark = row.remark ?? ''
   isEditing.value = true
   dialogError.value = ''
+  clearFieldErrors()
   dialogOpen.value = true
 }
 
 async function submitForm() {
+  if (!validate()) return
   dialogLoading.value = true
   dialogError.value = ''
   try {
@@ -118,8 +177,15 @@ async function submitForm() {
     dialogOpen.value = false
     await reload()
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : '操作失敗'
-    dialogError.value = msg
+    const axErr = err as { response?: { data?: { MESSAGE?: string } }; message?: string }
+    const msg = axErr?.response?.data?.MESSAGE ?? (err instanceof Error ? err.message : '操作失敗')
+    if (msg === 'Product code already exists') {
+      fieldErrors.productCode = '商品代碼已存在'
+    } else if (msg === 'Product name already exists') {
+      fieldErrors.productName = '商品名稱已存在'
+    } else {
+      dialogError.value = msg
+    }
   } finally {
     dialogLoading.value = false
   }
@@ -463,7 +529,9 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
               stack-label
               :readonly="isEditing"
               :bg-color="isEditing ? 'grey-2' : undefined"
-              hint="建立後不可修改"
+              :hint="fieldErrors.productCode ? '' : '建立後不可修改'"
+              :error="!!fieldErrors.productCode"
+              :error-message="fieldErrors.productCode"
             />
             <q-input
               v-model="form.productName"
@@ -471,6 +539,8 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
               dense
               outlined
               stack-label
+              :error="!!fieldErrors.productName"
+              :error-message="fieldErrors.productName"
             />
             <q-select
               v-model="form.productType"
@@ -480,6 +550,8 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
               outlined
               emit-value
               map-options
+              :error="!!fieldErrors.productType"
+              :error-message="fieldErrors.productType"
             />
             <q-select
               v-if="isEditing"
@@ -503,6 +575,8 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
               stack-label
               type="number"
               min="0"
+              :error="!!fieldErrors.basePremium"
+              :error-message="fieldErrors.basePremium"
             />
             <div class="product-dialog__spacer" aria-hidden="true" />
             <q-input
@@ -513,6 +587,8 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
               stack-label
               type="number"
               min="0"
+              :error="!!fieldErrors.minAmount"
+              :error-message="fieldErrors.minAmount"
             />
             <q-input
               v-model.number="form.maxAmount"
@@ -522,6 +598,8 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
               stack-label
               type="number"
               min="0"
+              :error="!!fieldErrors.maxAmount"
+              :error-message="fieldErrors.maxAmount"
             />
           </div>
 
@@ -536,6 +614,8 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
               type="number"
               min="0"
               suffix="歲"
+              :error="!!fieldErrors.minAge"
+              :error-message="fieldErrors.minAge"
             />
             <q-input
               v-model.number="form.maxAge"
@@ -546,6 +626,8 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
               type="number"
               min="0"
               suffix="歲"
+              :error="!!fieldErrors.maxAge"
+              :error-message="fieldErrors.maxAge"
             />
           </div>
 
@@ -561,17 +643,16 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
             hint="選填，將顯示於商品名稱下方"
           />
 
-          <q-banner v-if="dialogError" rounded class="bg-red-1 text-red-8 q-mt-md">
-            <template #avatar>
-              <q-icon name="error_outline" color="red-8" />
-            </template>
-            {{ dialogError }}
-          </q-banner>
         </q-card-section>
 
         <q-separator />
 
-        <q-card-actions align="right" class="product-dialog__actions">
+        <q-card-actions class="product-dialog__actions">
+          <span v-if="dialogError" class="dialog-error-msg">
+            <q-icon name="error_outline" size="16px" />
+            {{ dialogError }}
+          </span>
+          <q-space />
           <q-btn flat label="取消" no-caps v-close-popup />
           <q-btn
             color="primary"
@@ -714,6 +795,14 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
 
 .product-dialog__actions {
   padding: 12px 16px;
+}
+
+.dialog-error-msg {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #c53030;
+  font-size: 0.85rem;
 }
 
 .product-dialog__spacer {

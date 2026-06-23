@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import PageHero from '@/components/layout/PageHero.vue'
 import { useMyTasks } from '@/composables/useMyTasks'
 
@@ -16,7 +17,13 @@ const {
   STATUS_COLOR,
 } = useMyTasks()
 
+const router = useRouter()
+
 onMounted(() => search())
+
+function goToQuery(policyNo: string) {
+  router.push({ path: '/policy-mgmt', query: { tab: 'query', policyNo } })
+}
 
 const statusOptions = [
   { label: '全部', value: '' },
@@ -106,6 +113,14 @@ const columns = [
             :loading="isLoading"
             no-data-label="目前沒有待處理案件"
           >
+            <template #body-cell-APPLICATION_ID="props">
+              <q-td :props="props">
+                <span class="policy-no-link" @click="goToQuery(props.row.APPLICATION_ID)">
+                  {{ props.row.APPLICATION_ID }}
+                </span>
+              </q-td>
+            </template>
+
             <template #body-cell-APPLICATION_STATUS="props">
               <q-td :props="props">
                 <q-chip
@@ -129,3 +144,19 @@ const columns = [
     </div>
   </section>
 </template>
+
+<style scoped>
+.policy-no-link {
+  color: #38a169;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.policy-no-link:hover {
+  color: #276749;
+}
+</style>
