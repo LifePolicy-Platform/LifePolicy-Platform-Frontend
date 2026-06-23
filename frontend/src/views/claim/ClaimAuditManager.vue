@@ -379,21 +379,7 @@ auditForm.action = actionType
     $q.notify({ type: 'warning', message: '必須填寫正確的核決理賠金額！' })
     return
   }
-  // 【黃金防盾】送出前，強制把畫面上千分位輸入框的值，洗成純數字存回 auditForm
-  // if (displayApproveAmount.value) {
-  //   const cleanNum = displayApproveAmount.value.replace(/,/g, '').trim()
-  //   auditForm.approveAmount = cleanNum === '' ? 0 : Number(cleanNum)
-  // } else {
-  //   auditForm.approveAmount = 0
-  // }
 
-  // auditForm.action = actionType
-  
-  // // 如果是同意結案，強制檢查金額必須大於等於 0 且不能是 null
-  // if (actionType === 'APPROVED' && (auditForm.approveAmount === null || auditForm.approveAmount === undefined || auditForm.approveAmount < 0)) {
-  //   $q.notify({ type: 'warning', message: '必須填寫正確的核決理賠金額！' })
-  //   return
-  // }
 
   $q.dialog({
     title: '審核確認送出',
