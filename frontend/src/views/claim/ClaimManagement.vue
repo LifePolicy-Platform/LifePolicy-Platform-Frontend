@@ -807,7 +807,7 @@ async function saveClaim() {
   // 🌟 核心防呆：如果是修改模式，且該案目前為「PENDING」狀態
   if (dialog.form.claimNo && dialog.form.claimStatus === 'PENDING') {
     $q.dialog({
-      title: '⚠️ 重新送審提示',
+      title: '重新送審提示',
       message: '本案目前處於「審核中 (PENDING)」階段。若確認進行修改儲存，案件狀態將重設為「新件待審 (SUBMIT)」並重新提交審核，是否確定？',
       cancel: {
         label: '取消修改',

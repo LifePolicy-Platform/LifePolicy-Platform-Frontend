@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { useAuthStore } from '@/stores/auth'
@@ -250,7 +250,7 @@ function formatRange(min: number | null | undefined, max: number | null | undefi
   return `${formatCurrency(min)} ~ ${formatCurrency(max)}${unit}`
 }
 
-const columns = [
+const ALL_COLUMNS = [
   { name: 'productCode', label: '商品代碼', field: 'productCode', align: 'left' as const, sortable: true },
   { name: 'productName', label: '商品名稱', field: 'productName', align: 'left' as const, sortable: true },
   { name: 'productType', label: '類型', field: 'productType', align: 'left' as const },
@@ -262,10 +262,16 @@ const columns = [
   { name: 'actions', label: '操作', field: 'actions', align: 'center' as const },
 ]
 
+const columns = computed(() =>
+  isAdmin.value ? ALL_COLUMNS : ALL_COLUMNS.filter(c => c.name !== 'actions')
+)
+
 const typeOptions = [{ label: '全部', value: '' }, ...PRODUCT_TYPE_OPTIONS]
 const statusOptions = [{ label: '全部', value: '' }, ...PRODUCT_STATUS_OPTIONS]
 const typeFormOptions = PRODUCT_TYPE_OPTIONS
 const statusFormOptions = PRODUCT_STATUS_OPTIONS
+
+const pagination = ref({ rowsPerPage: 5 })
 </script>
 
 <template>
@@ -389,8 +395,8 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
             bordered
             dense
             :loading="isLoading"
-            hide-pagination
-            :rows-per-page-options="[0]"
+            v-model:pagination="pagination"
+            :rows-per-page-options="[5, 10, 20]"
             no-data-label="查無符合條件的商品"
           >
             <template #body-cell-productCode="props">
@@ -462,7 +468,7 @@ const statusFormOptions = PRODUCT_STATUS_OPTIONS
 
             <template #body-cell-actions="props">
               <q-td :props="props">
-                <div class="product-actions">
+                <div v-if="isAdmin" class="product-actions">
                   <q-btn
                     size="sm"
                     flat
