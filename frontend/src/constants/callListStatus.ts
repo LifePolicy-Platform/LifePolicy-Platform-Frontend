@@ -23,7 +23,15 @@ export function callListStatusColor(status: number | null | undefined): string {
   }
 }
 
+/** 將 API / DB 回傳的名單狀態正規化為數字 */
+export function normalizeListStatus(status: number | string | null | undefined): number | null {
+  if (status == null || status === '') return null
+  const value = Number(status)
+  return Number.isFinite(value) ? value : null
+}
+
 /** 僅 0 未處理、2 已結案 可新增約訪 */
-export function canCreateAppointment(listStatus: number | null | undefined): boolean {
-  return listStatus === 0 || listStatus === 2
+export function canCreateAppointment(listStatus: number | string | null | undefined): boolean {
+  const status = normalizeListStatus(listStatus)
+  return status === 0 || status === 2
 }

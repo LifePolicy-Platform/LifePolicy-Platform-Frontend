@@ -23,7 +23,7 @@ const allSelected = defineModel<boolean>('allSelected', { required: true })
         <span>查詢結果：</span>
         <span class="result-badge">{{ selectedCountLabel }}</span>
       </div>
-      <div class="result-count">查詢筆數：{{ rows.length }}</div>
+      <div class="result-count">查詢筆數：{{ rows?.length ?? 0 }}</div>
     </div>
 
     <div v-if="isLoading" class="table-state">查詢中…</div>
@@ -49,7 +49,7 @@ const allSelected = defineModel<boolean>('allSelected', { required: true })
             </tr>
           </thead>
           <tbody>
-            <tr v-if="hasSearched && rows.length === 0">
+            <tr v-if="hasSearched && (rows?.length ?? 0) === 0">
               <td colspan="9" class="table-empty">查無資料，請再確認</td>
             </tr>
 

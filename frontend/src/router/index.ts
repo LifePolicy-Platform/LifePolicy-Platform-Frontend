@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory, type RouteMeta } from 'vue-router'
+﻿import { createRouter, createWebHistory, type RouteMeta } from 'vue-router'
 import { setupRouterGuards } from './guards'
 import HomeView from '../views/HomeView.vue'
 import MyTasksView from '../views/MyTasksView.vue'
@@ -53,7 +53,7 @@ const router = createRouter({
       path: '/home',
       name: 'home',
       component: HomeView,
-      meta: { title: '首頁 Dashboard', label: '首頁 Dashboard', hasTopHero: true },
+      meta: { title: '首頁 數據分析', label: '首頁 數據分析', hasTopHero: true },
     },
     {
       path: '/my-tasks',
@@ -157,7 +157,7 @@ const router = createRouter({
       path: '/users',
       name: 'users',
       component: UsersView,
-      meta: { title: '使用者管理', label: '使用者權限管理', requiresAuth: true, requiresRole: 'ADMIN' },
+      meta: { title: '使用者管理', label: '使用者權限管理', requiresAuth: true, requiresRole: 'ADMIN', hasTopHero: true },
     },
     {
       path: '/workbench',
@@ -168,13 +168,14 @@ const router = createRouter({
     {
     path: '/claim/ClaimManagement',
     name: 'ClaimManagement',
-    // 💡 確保這裡的 import 路徑有補上 /claim/ 資料夾
     component: () => import('@/views/claim/ClaimManagement.vue'),
+    meta: { title: '理賠管理', label: '理賠管理', hasTopHero: true },
     },
     {
     path: '/claim/ClaimAuditManager',
     name: 'ClaimAuditManager',
     component: () => import('@/views/claim/ClaimAuditManager.vue'),
+    meta: { title: '理賠審核', label: '理賠審核', hasTopHero: true },
     }
   ],
 })

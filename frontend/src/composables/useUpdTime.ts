@@ -1,6 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
-import { batchUpdateAptRecords, searchAptRecords } from '@/services/appointmentService'
+import { batchUpdateAptRecords, searchAptRecords, searchAptRecordsByCustName } from '@/services/appointmentService'
 import type {
   AptBatchUpdateResponse,
   AptRecordListRequest,
@@ -9,16 +9,19 @@ import type {
   UpdateMode,
 } from '@/types/customer'
 import {
-  formatDate,
   formatTime,
   normalizeRecallTime,
   parseDateOnly,
   diffCalendarDays,
   todayDateOnly,
-  timePart,
 } from '@/utils/appointmentDateTime'
 
-const MODE_MAP = { today: 'TODAY', workdays: 'WORKDAYS', specific: 'SPECIFIC' } as const
+const MODE_MAP = { workdays: 'WORKDAYS', specific: 'SPECIFIC' } as const
+
+function toInputDate(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
 
 /**
  * 約訪時間更新頁的頁面邏輯。
@@ -32,10 +35,18 @@ export function useUpdTime() {
   const yesterday = new Date(now)
   yesterday.setDate(yesterday.getDate() - 1)
 
-  const searchStartDate = ref(formatDate(yesterday))
+  const searchStartDate = ref(toInputDate(yesterday))
   const searchStartTime = ref(formatTime(now))
-  const searchEndDate = ref(formatDate(now))
+  const searchEndDate = ref(toInputDate(now))
   const searchEndTime = ref('22:00')
+
+  // --- 約訪歷程查詢 ---
+  const historyCustName = ref('')
+  const historyRows = ref<AptRecordListResponse[]>([])
+  const isHistoryLoading = ref(false)
+  const historyErrorMsg = ref('')
+  const historyNameError = ref('')
+  const historyHasSearched = ref(false)
 
   // --- 查詢結果與勾選 ---
   const rows = ref<AptRecordListResponse[]>([])
@@ -49,9 +60,9 @@ export function useUpdTime() {
   const hasSearched = ref(false)
 
   // --- 儲存表單狀態 ---
-  const updateMode = ref<UpdateMode>('today')
+  const updateMode = ref<UpdateMode>('workdays')
   const workdaysCount = ref(1)
-  const specificDate = ref('')
+  const specificDate = ref(toInputDate(new Date()))
   const specificTime = ref('')
 
   // --- 儲存流程狀態 ---
@@ -141,18 +152,17 @@ export function useUpdTime() {
         return { ...r, recallTime: specificDateTime }
       }
 
-      if (updateMode.value === 'today') {
-        const today = formatDate(new Date()).replace(/\//g, '-')
-        const oldTime = timePart(row.recallTime) || '00:00'
-        return { ...r, recallTime: `${today} ${oldTime}:00` }
-      }
-
       return r
     })
   }
 
   watch(updateMode, (mode) => {
-    if (mode === 'specific') keepOnlyOldestSelectedRow()
+    if (mode === 'specific') {
+      if (!specificDate.value) {
+        specificDate.value = toInputDate(new Date())
+      }
+      keepOnlyOldestSelectedRow()
+    }
   })
 
   watch(selectedRowIds, () => {
@@ -231,6 +241,31 @@ export function useUpdTime() {
     }
   }
 
+  /** 約訪歷程：依客戶姓名查詢 */
+  async function searchHistory() {
+    historyErrorMsg.value = ''
+    historyNameError.value = ''
+
+    const custName = historyCustName.value.trim()
+    if (!custName) {
+      historyNameError.value = '請輸入客戶姓名'
+      return
+    }
+
+    historyCustName.value = custName
+    isHistoryLoading.value = true
+    try {
+      historyRows.value = await searchAptRecordsByCustName(custName)
+      historyHasSearched.value = true
+    } catch {
+      historyErrorMsg.value = '查詢失敗，請稍後再試'
+      historyRows.value = []
+      historyHasSearched.value = true
+    } finally {
+      isHistoryLoading.value = false
+    }
+  }
+
   /** 儲存流程：驗證 → loading → 呼叫 service → 更新結果 */
   async function saveUpdate() {
     saveError.value = ''
@@ -285,6 +320,31 @@ export function useUpdTime() {
     }
   }
 
+  function resetSearchFilters() {
+    const now = new Date()
+    const yesterday = new Date(now)
+    yesterday.setDate(yesterday.getDate() - 1)
+
+    searchStartDate.value = toInputDate(yesterday)
+    searchStartTime.value = formatTime(now)
+    searchEndDate.value = toInputDate(now)
+    searchEndTime.value = '22:00'
+    rangeError.value = ''
+    errorMsg.value = ''
+    hasSearched.value = false
+    rows.value = []
+    selectedRowIds.value = []
+    updateResults.value = new Map()
+  }
+
+  function resetHistoryFilters() {
+    historyCustName.value = ''
+    historyErrorMsg.value = ''
+    historyNameError.value = ''
+    historyHasSearched.value = false
+    historyRows.value = []
+  }
+
   return {
     searchStartDate,
     searchStartTime,
@@ -308,5 +368,14 @@ export function useUpdTime() {
     allSelected,
     searchAppointments,
     saveUpdate,
+    resetSearchFilters,
+    historyCustName,
+    historyRows,
+    isHistoryLoading,
+    historyErrorMsg,
+    historyNameError,
+    historyHasSearched,
+    searchHistory,
+    resetHistoryFilters,
   }
 }

@@ -7,7 +7,7 @@ import {
   QInput, QItem, QItemLabel, QItemSection, QList, QOptionGroup,
   QPage, QPagination, QPopupProxy, QRadio, QSelect, QSeparator,
   QSpace, QSpinner, QTab, QTable, QTabPanel, QTabPanels, QTabs,
-  QTd, QTime, QToggle, QTr,QAvatar
+  QTd, QTh, QTime, QToggle, QTr, QAvatar
 } from 'quasar'
 import quasarLang from 'quasar/lang/zh-TW'
 import router from './router/index.ts'
@@ -35,8 +35,8 @@ app.use(Quasar, {
   },
   components: {
     QBanner, QBtn, QCard, QCardSection, QCheckbox, QChip, QDate, QDialog, QIcon, QImg, QInput,
-    QItem, QItemLabel, QItemSection, QList, QPopupProxy, QRadio,
-    QSelect, QSeparator, QTab, QTable, QPagination, QTabPanel, QTabPanels, QTabs, QTd, QTime, QTr,
+    QItem, QItemLabel, QItemSection, QList, QOptionGroup, QPopupProxy, QRadio,
+    QSelect, QSeparator, QTab, QTable, QPagination, QTabPanel, QTabPanels, QTabs, QTd, QTh, QTime, QTr,
     QPage, QSpace, QCardActions,QBadge,QInnerLoading,QAvatar
   },
   directives: {

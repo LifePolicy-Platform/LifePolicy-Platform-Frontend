@@ -21,7 +21,7 @@ const columns = [
   { name: 'projectCode', label: '專案代碼', field: 'projectCode', align: 'left' as const },
   { name: 'listStatus', label: '名單狀態', field: 'listStatus', align: 'left' as const },
   { name: 'appointmentTime', label: '約訪時間', field: 'appointmentTime', align: 'left' as const, sortable: true },
-  { name: 'recallTime', label: '回訪時間', field: 'recallTime', align: 'left' as const, sortable: true },
+  { name: 'recallTime', label: '實際約訪時間', field: 'recallTime', align: 'left' as const, sortable: true },
 ]
 
 function formatDateTime(value: string | null | undefined): string {

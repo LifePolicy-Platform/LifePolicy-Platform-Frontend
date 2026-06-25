@@ -28,7 +28,7 @@ const achievementGap = computed(() =>
   <section class="home-page">
     <PageHero
       compact
-      title="首頁 Dashboard"
+      title="首頁 數據分析"
       subtitle="今年業績概況、投保目標與保單申請趨勢"
     />
 
@@ -71,7 +71,7 @@ const achievementGap = computed(() =>
         <div class="home-grid home-grid--pair">
           <DashboardLineChart
             title="當月申請保單"
-            subtitle="每日申請件數"
+            subtitle="申請件數趨勢"
             :data="monthApplications"
             y-axis-label="件數"
           />
@@ -86,7 +86,7 @@ const achievementGap = computed(() =>
         <div class="home-grid home-grid--pair">
           <DashboardBarChart
             title="商品種類銷售量"
-            subtitle="壽險 / 醫療險 / 意外險（今年核准）"
+            subtitle="今年商品銷售分布"
             :data="productCategorySales"
             y-axis-label="件數"
           />

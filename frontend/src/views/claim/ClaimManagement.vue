@@ -1,44 +1,60 @@
 <template>
-  <div class="q-pa-md bg-grey-1">
-    <div class="row items-center justify-between q-mb-md">
-      <div class="text-h5 text-weight-bold text-primary">理賠管理</div>
-      <q-btn color="primary" icon="add" label="新增理賠案件" @click="openDialog(null)" />
-    </div>
+  <section class="page-with-hero">
+    <PageHero title="理賠管理" subtitle="查詢、新增與修改理賠案件" />
 
-    <q-card class="q-mb-md flat bordered">
-      <q-card-section class="row q-col-gutter-sm items-center">
-        <div class="col-12 col-sm-3">
-          <q-select v-model="filters.status" :options="statusOptions" emit-value map-options label="案件狀態" outlined dense clearable />
-        </div>
-        <div class="col-12 col-sm-3">
-          <q-input v-model="filters.policyNo" label="保單號碼" outlined dense clearable />
-        </div>
-        <div class="col-12 col-sm-3">
-          <q-input
-            ref="applyDateInputRef"
-            v-model="filters.applyDate"
-            type="date"
-            label="申請日期"
-            outlined
-            dense
-            stack-label
-            clearable
-            behavior="menu"
-            @click="openDatePicker"
-          />
-        </div>
-        <div class="col-12 col-sm-3">
-          <q-btn color="secondary" icon="search" label="查詢" class="q-mr-sm" @click="loadData" />
-          <q-btn color="grey-6" label="顯示全部" @click="resetFilters" />
-        </div>
-      </q-card-section>
-    </q-card>
+    <div class="page-body">
+      <q-card flat class="page-card page-card--filter q-mb-md">
+        <q-card-section>
+          <div class="page-card__header q-mb-sm">
+            <div>
+              <p class="page-card__kicker">CLAIM FILTER</p>
+              <div class="page-card__title">查詢條件</div>
+            </div>
+          </div>
+          <div class="row q-col-gutter-sm items-end q-mt-sm">
+            <div class="col-12 col-sm-4">
+              <q-select v-model="filters.status" :options="statusOptions" emit-value map-options label="案件狀態" outlined dense clearable />
+            </div>
+            <div class="col-12 col-sm-4">
+              <q-input v-model="filters.policyNo" label="保單號碼" outlined dense clearable />
+            </div>
+            <div class="col-12 col-sm-4">
+              <q-input
+                ref="applyDateInputRef"
+                v-model="filters.applyDate"
+                type="date"
+                label="申請日期"
+                outlined
+                dense
+                stack-label
+                clearable
+                behavior="menu"
+                @click="openDatePicker"
+              />
+            </div>
+          </div>
+          <div class="q-mt-md row items-center wrap q-gutter-sm">
+            <q-btn color="primary" unelevated icon="search" label="查詢" no-caps :loading="loading" @click="loadData" />
+            <q-btn outline color="primary" label="顯示全部" no-caps icon="refresh" @click="resetFilters" />
+          </div>
+        </q-card-section>
+      </q-card>
 
-    <q-table :rows="rows || []" :columns="columns" row-key="claimNo" :loading="loading" flat bordered class="bg-white">
+      <q-card flat class="page-card page-card--data">
+        <q-card-section>
+          <div class="page-card__header q-mb-md">
+            <div>
+              <p class="page-card__kicker">CLAIM LIST</p>
+              <div class="page-card__title">理賠清單</div>
+            </div>
+            <q-btn color="primary" unelevated icon="add" label="新增理賠案件" no-caps @click="openDialog(null)" />
+          </div>
+
+          <q-table :rows="rows || []" :columns="columns" row-key="claimNo" :loading="loading" flat bordered class="app-table">
       <template v-slot:body-cell-claimStatus="props">
         <q-td :props="props">
           <q-badge :color="getStatusColor(props.value)" text-color="white" class="q-pa-xs text-weight-medium">
-            {{ props.value }}
+            {{ getStatusLabel(props.value) }} 
           </q-badge>
         </q-td>
       </template>
@@ -46,11 +62,22 @@
       <template v-slot:body-cell-actions="props">
         <q-td :props="props" class="q-gutter-xs">
           <q-btn size="sm" color="info" flat icon="visibility" label="詳情" @click="viewDetail(props.row)" />
-          <q-btn size="sm" color="warning" flat icon="edit" label="修改" @click="openDialog(props.row)" />
+          <!--<q-btn size="sm" color="warning" flat icon="edit" label="修改" @click="openDialog(props.row)" /> -->
+           <q-btn 
+  size="sm" 
+  :color="props.row.claimStatus === 'RETURN' ? 'orange-8' : 'warning'" 
+  flat 
+  icon="edit" 
+  :label="props.row.claimStatus === 'RETURN' ? '補件' : '修改'" 
+  @click="openDialog(props.row)" 
+/>
           <!-- <q-btn size="sm" color="negative" flat icon="delete" label="刪除" :disabled="props.row.claimStatus !== 'PENDING'" @click="confirmDelete(props.row.claimNo)" /> -->
         </q-td>
       </template>
-    </q-table>
+          </q-table>
+        </q-card-section>
+      </q-card>
+    </div>
 
     <q-dialog v-model="dialog.show" persistent>
       <q-card style="width: 600px; max-width: 90vw;">
@@ -309,7 +336,7 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
@@ -318,6 +345,7 @@ import { useQuasar } from 'quasar'
 import type { QTableProps } from 'quasar'
 import axios from 'axios'
 import { watch } from 'vue'
+import PageHero from '@/components/layout/PageHero.vue'
 
 // 將原本的 import axios 替換成這些 API 匯入
 import { 
@@ -337,11 +365,11 @@ const $q = useQuasar()
 
 const filters = reactive({ status: '', policyNo: '', applyDate: '' })
 const statusOptions = [
-  { label: '最新案件待處理 (SUBMIT)', value: 'SUBMIT' },
-  { label: '審核中 (PENDING)', value: 'PENDING' },
-  { label: '已結案-核准 (APPROVED)', value: 'APPROVED' },
-  { label: '已結案-駁回 (REJECTED)', value: 'REJECTED' },
-  { label: '已被撤回須補件 (RETURN)', value: 'RETURN' }
+  { label: '新件待初審', value: 'SUBMIT' },
+  { label: '複審中', value: 'PENDING' },
+  { label: '已結案-核准', value: 'APPROVED' },
+  { label: '已結案-駁回', value: 'REJECTED' },
+  { label: '已被退回須補件', value: 'RETURN' }
 ]
 
 const loading = ref(false)
@@ -675,6 +703,17 @@ async function viewDetail(row: ClaimModel) {
   }
 }
 
+function getStatusLabel(status: string): string {
+  const map: Record<string, string> = {
+    SUBMIT: '新件待初審',
+    PENDING: '複審中',
+    APPROVED: '已核准',
+    REJECTED: '已駁回',
+    RETURN: '退回須補件'
+  }
+  return map[status] || status // 如果後端回傳了未定義的狀態，則顯示原英文
+}
+
 async function saveClaim() {
   // 1. 原有的：檢查保單號碼與客戶 ID
   if (!dialog.form.policyNo || !dialog.form.memberId) {
@@ -697,11 +736,11 @@ async function saveClaim() {
   if (isSubmitting.value) return
   isSubmitting.value = true
 
-  // 🌟 核心防呆：如果是修改模式，且該案目前為「PENDING」狀態
-  if (dialog.form.claimNo && dialog.form.claimStatus === 'PENDING') {
+  // 🌟 核心防呆：如果是修改模式，且該案目前為「RETURN」狀態
+  if (dialog.form.claimNo && dialog.form.claimStatus === 'RETURN') {
     $q.dialog({
-      title: '⚠️ 重新送審提示',
-      message: '本案目前處於「審核中 (PENDING)」階段。若確認進行修改儲存，案件狀態將重設為「新件待審 (SUBMIT)」並重新提交審核，是否確定？',
+      title: '重新送審提示',
+      message: '若確認進行儲存補件，案件狀態將重設為「新件待審 (SUBMIT)」並重新提交審核，是否確定？',
       cancel: {
         label: '取消修改',
         color: 'grey'
@@ -733,6 +772,23 @@ async function saveClaim() {
     
     return // 阻斷下方直接儲存的流程
   }
+
+  // 🌟 RETURN 補件：儲存後自動把狀態改回 SUBMIT 重新送審
+if (dialog.form.claimNo && dialog.form.claimStatus === 'RETURN') {
+  if (isSubmitting.value) return
+  isSubmitting.value = true
+  try {
+    dialog.form.claimStatus = 'SUBMIT'
+    await updateClaimApi(dialog.form.claimNo, dialog.form)
+    $q.notify({ type: 'positive', message: '補件完成，已重新提交審核！' })
+    dialog.show = false
+    loadData()
+  } catch (err) {
+    $q.notify({ type: 'negative', message: '補件送出時發生錯誤' })
+  } finally {
+    isSubmitting.value = false
+  }
+}
 
   // 以下為常規儲存流程 (新增案件，或非 PENDING 狀態的修改案件)
   try {
@@ -816,7 +872,7 @@ function viewPdf(path: string | undefined) {
 
   // 2. 如果路徑是 /uploads/...，直接加上後端 Base URL
   // 請確認 import.meta.env.VITE_API_BASE_URL 有值
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8085';
   
   // 組合網址：確保中間只有一個斜線
   const cleanBase = baseUrl.replace(/\/$/, '');
