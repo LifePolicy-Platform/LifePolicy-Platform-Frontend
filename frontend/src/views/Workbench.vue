@@ -7,6 +7,7 @@ import type { ProductListItem1 } from '@/types/productMgmt'
 import type { PolicyRecord } from '@/types/policyApplication'
 import type { PolicyHistoryItem } from '@/types/policyMgmt'
 import PolicyHistoryTable from '@/components/policy/PolicyHistoryTable.vue'
+import PolicyHistoryTimeline from '@/components/policy/PolicyHistoryTimeline.vue'
 import PolicyDocumentPanel from '@/components/policy/PolicyDocumentPanel.vue'
 import {
   createPolicyApplication,
@@ -297,6 +298,7 @@ const columns = [
 const historyDialogOpen = ref(false)
 const historyLoading = ref(false)
 const historyPolicyNo = ref('')
+const historyCurrentStatus = ref('')
 const historyRows = ref<PolicyHistoryItem[]>([])
 
 function formatAprvLogTime(value?: string | null): string {
@@ -307,12 +309,20 @@ function formatAprvLogTime(value?: string | null): string {
 async function openPolicyHistory(record: PolicyRecord) {
   const policyNo = record.APPLICATION_ID
   historyPolicyNo.value = policyNo
+  historyCurrentStatus.value = record.APPLICATION_STATUS || ''
   historyDialogOpen.value = true
   historyLoading.value = true
   historyRows.value = []
   try {
     const logs = await fetchPolicyAprvLogs(policyNo)
-    historyRows.value = logs.map((log) => ({
+    historyRows.value = logs
+      .slice()
+      .sort((a, b) => {
+        const timeCompare = (a.APRV_TIME || '').localeCompare(b.APRV_TIME || '')
+        if (timeCompare !== 0) return timeCompare
+        return String(a.POLICY_LOG_NO ?? '').localeCompare(String(b.POLICY_LOG_NO ?? ''), undefined, { numeric: true })
+      })
+      .map((log) => ({
       id: log.POLICY_LOG_NO,
       time: formatAprvLogTime(log.APRV_TIME),
       status: applicationStatusLabel(log.APRV_STATUS),
@@ -353,6 +363,14 @@ const riskLevelHint = computed(() => {
 })
 
 const duplicateWarning = ref('尚未檢查')
+type DuplicateCheckResult = 'idle' | 'ok' | 'fail'
+const duplicateCheckResult = ref<DuplicateCheckResult>('idle')
+
+const duplicateWarningClass = computed(() => {
+  if (duplicateCheckResult.value === 'ok') return 'text-positive text-weight-medium'
+  if (duplicateCheckResult.value === 'fail') return 'text-negative text-weight-medium'
+  return ''
+})
 
 const documentHint = computed(() => {
   if (!canSupervisorReview.value) {
@@ -568,7 +586,7 @@ async function handleCreate() {
   submitting.value = true
   try {
     const result = await createPolicyApplication(buildPayload(createForm))
-    notifySuccess(`新增成功，申請編號 ${result.APPLICATION_ID}`)
+    notifySuccess(`新增成功，保單編號 ${result.APPLICATION_ID}`)
     Object.assign(createForm, blankApplication())
   } catch (error: any) {
     notifyError(error.response?.data?.MESSAGE || '新增失敗')
@@ -806,6 +824,7 @@ async function handleReview() {
 async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, currentApplicationId: string | null) {
   if (!form.applicantIdNo || !form.insuredIdNo || !form.productCode) {
     duplicateWarning.value = '請先填妥投保人、被保人與商品代碼後再檢查'
+    duplicateCheckResult.value = 'idle'
     return
   }
   try {
@@ -822,11 +841,16 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
     const duplicates = currentApplicationId
       ? records.filter((item) => item.APPLICATION_ID !== currentApplicationId)
       : records
-    duplicateWarning.value = duplicates.length
-      ? `偵測到 ${duplicates.length} 筆進行中申請（送件/待審/退回），送出前請再確認`
-      : '未發現重複投保風險，可進行投保申請'
+    if (duplicates.length) {
+      duplicateWarning.value = `偵測到 ${duplicates.length} 筆進行中申請（送件/待審/退回），送出前請再確認`
+      duplicateCheckResult.value = 'fail'
+    } else {
+      duplicateWarning.value = '未發現重複投保風險，可進行投保申請'
+      duplicateCheckResult.value = 'ok'
+    }
   } catch (error: any) {
     duplicateWarning.value = error.response?.data?.MESSAGE || '檢查失敗'
+    duplicateCheckResult.value = 'fail'
   }
 }
 </script>
@@ -1052,7 +1076,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
 
               <template v-else>
                 <div class="form-grid q-mt-md">
-                  <q-input v-model="queryForm.applicationId" label="申請編號" outlined dense />
+                  <q-input v-model="queryForm.applicationId" label="保單編號" outlined dense />
                   <q-input v-model="queryForm.applicantIdNo" label="投保人身分證" outlined dense />
                   <q-select
                     v-model="queryForm.productCode"
@@ -1429,7 +1453,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
               <div class="text-subtitle1 text-weight-bold q-mb-md workbench-insight__title">即時規則提示</div>
               <div class="hint-row"><span class="hint-label">保費比例</span><span>{{ premiumRatioHint }}</span></div>
               <div class="hint-row"><span class="hint-label">核保風險等級</span><span>{{ riskLevelHint }}</span></div>
-              <div class="hint-row"><span class="hint-label">重複投保預警</span><span>{{ duplicateWarning }}</span></div>
+              <div class="hint-row"><span class="hint-label">重複投保預警</span><span :class="duplicateWarningClass">{{ duplicateWarning }}</span></div>
             </q-card-section>
           </q-card>
 
@@ -1480,7 +1504,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
         <div class="col">
           <div class="text-h6 text-weight-bold text-grey-9">審核歷程</div>
           <div class="text-caption text-grey-7 q-mt-xs">
-            申請編號
+            保單編號
             <q-badge outline color="grey-6" class="q-ml-xs history-dialog-card__policy-no">
               {{ historyPolicyNo }}
             </q-badge>
@@ -1492,6 +1516,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
       <q-separator />
 
       <q-card-section class="relative-position history-dialog-body">
+        <PolicyHistoryTimeline :rows="historyRows" :current-status="historyCurrentStatus" />
         <PolicyHistoryTable :rows="historyRows" />
         <q-inner-loading :showing="historyLoading" color="primary" />
       </q-card-section>
@@ -1772,14 +1797,19 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
 }
 
 .history-dialog-body {
-  min-height: 160px;
   padding: 16px 20px 20px;
   background: var(--wb-surface-muted);
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .history-dialog-card {
   min-width: 680px;
   max-width: 95vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid var(--wb-border);

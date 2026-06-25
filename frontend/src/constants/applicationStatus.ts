@@ -4,7 +4,7 @@ export const APPLICATION_STATUS_LABEL: Record<ApplicationStatusCode, string> = {
   SUBMIT: '待業務審核',
   PENDING: '待主管審核',
   APPROVED: '已核准',
-  REJECTED: '已拒絕',
+  REJECTED: '已駁回',
   RETURN: '退回補件',
 }
 
