@@ -54,7 +54,7 @@
       <template v-slot:body-cell-claimStatus="props">
         <q-td :props="props">
           <q-badge :color="getStatusColor(props.value)" text-color="white" class="q-pa-xs text-weight-medium">
-            {{ props.value }}
+            {{ getStatusLabel(props.value) }} 
           </q-badge>
         </q-td>
       </template>
@@ -62,7 +62,15 @@
       <template v-slot:body-cell-actions="props">
         <q-td :props="props" class="q-gutter-xs">
           <q-btn size="sm" color="info" flat icon="visibility" label="詳情" @click="viewDetail(props.row)" />
-          <q-btn size="sm" color="warning" flat icon="edit" label="修改" @click="openDialog(props.row)" />
+          <!--<q-btn size="sm" color="warning" flat icon="edit" label="修改" @click="openDialog(props.row)" /> -->
+           <q-btn 
+  size="sm" 
+  :color="props.row.claimStatus === 'RETURN' ? 'orange-8' : 'warning'" 
+  flat 
+  icon="edit" 
+  :label="props.row.claimStatus === 'RETURN' ? '補件' : '修改'" 
+  @click="openDialog(props.row)" 
+/>
           <!-- <q-btn size="sm" color="negative" flat icon="delete" label="刪除" :disabled="props.row.claimStatus !== 'PENDING'" @click="confirmDelete(props.row.claimNo)" /> -->
         </q-td>
       </template>
@@ -394,11 +402,11 @@ const $q = useQuasar()
 
 const filters = reactive({ status: '', policyNo: '', applyDate: '' })
 const statusOptions = [
-  { label: '最新案件待處理 (SUBMIT)', value: 'SUBMIT' },
-  { label: '審核中 (PENDING)', value: 'PENDING' },
-  { label: '已結案-核准 (APPROVED)', value: 'APPROVED' },
-  { label: '已結案-駁回 (REJECTED)', value: 'REJECTED' },
-  { label: '已被撤回須補件 (RETURN)', value: 'RETURN' }
+  { label: '新件待初審', value: 'SUBMIT' },
+  { label: '複審中', value: 'PENDING' },
+  { label: '已結案-核准', value: 'APPROVED' },
+  { label: '已結案-駁回', value: 'REJECTED' },
+  { label: '已被退回須補件', value: 'RETURN' }
 ]
 
 const loading = ref(false)
@@ -782,6 +790,17 @@ async function viewDetail(row: ClaimModel) {
   }
 }
 
+function getStatusLabel(status: string): string {
+  const map: Record<string, string> = {
+    SUBMIT: '新件待初審',
+    PENDING: '複審中',
+    APPROVED: '已核准',
+    REJECTED: '已駁回',
+    RETURN: '退回須補件'
+  }
+  return map[status] || status // 如果後端回傳了未定義的狀態，則顯示原英文
+}
+
 async function saveClaim() {
   // 1. 原有的：檢查保單號碼與客戶 ID
   if (!dialog.form.policyNo || !dialog.form.memberId) {
@@ -804,11 +823,11 @@ async function saveClaim() {
   if (isSubmitting.value) return
   isSubmitting.value = true
 
-  // 🌟 核心防呆：如果是修改模式，且該案目前為「PENDING」狀態
-  if (dialog.form.claimNo && dialog.form.claimStatus === 'PENDING') {
+  // 🌟 核心防呆：如果是修改模式，且該案目前為「RETURN」狀態
+  if (dialog.form.claimNo && dialog.form.claimStatus === 'RETURN') {
     $q.dialog({
       title: '重新送審提示',
-      message: '本案目前處於「審核中 (PENDING)」階段。若確認進行修改儲存，案件狀態將重設為「新件待審 (SUBMIT)」並重新提交審核，是否確定？',
+      message: '若確認進行儲存補件，案件狀態將重設為「新件待審 (SUBMIT)」並重新提交審核，是否確定？',
       cancel: {
         label: '取消修改',
         color: 'grey'
@@ -840,6 +859,23 @@ async function saveClaim() {
     
     return // 阻斷下方直接儲存的流程
   }
+
+  // 🌟 RETURN 補件：儲存後自動把狀態改回 SUBMIT 重新送審
+if (dialog.form.claimNo && dialog.form.claimStatus === 'RETURN') {
+  if (isSubmitting.value) return
+  isSubmitting.value = true
+  try {
+    dialog.form.claimStatus = 'SUBMIT'
+    await updateClaimApi(dialog.form.claimNo, dialog.form)
+    $q.notify({ type: 'positive', message: '補件完成，已重新提交審核！' })
+    dialog.show = false
+    loadData()
+  } catch (err) {
+    $q.notify({ type: 'negative', message: '補件送出時發生錯誤' })
+  } finally {
+    isSubmitting.value = false
+  }
+}
 
   // 以下為常規儲存流程 (新增案件，或非 PENDING 狀態的修改案件)
   try {

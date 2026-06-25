@@ -19,12 +19,12 @@ export function useNotifications() {
   let timer: ReturnType<typeof setInterval> | null = null
 
   async function refreshCount() {
-    if (!authStore.isAuthenticated) return
-    try {
-      unreadCount.value = await fetchUnreadCount()
-    } catch {
-      // 靜默失敗，不中斷畫面
-    }
+    // if (!authStore.isAuthenticated) return
+    // try {
+    //   unreadCount.value = await fetchUnreadCount()
+    // } catch {
+    //   // 靜默失敗，不中斷畫面
+    // }
   }
 
   async function loadNotifications() {
@@ -52,11 +52,11 @@ export function useNotifications() {
 
   onMounted(() => {
     refreshCount()
-    timer = setInterval(refreshCount, POLL_INTERVAL_MS)
+    // timer = setInterval(refreshCount, POLL_INTERVAL_MS)
   })
 
   onUnmounted(() => {
-    if (timer) clearInterval(timer)
+    // if (timer) clearInterval(timer)
   })
 
   return {
