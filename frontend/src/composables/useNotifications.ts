@@ -1,4 +1,4 @@
-import { ref, onMounted, onUnmounted } from 'vue'
+﻿import { ref, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import {
   fetchUnreadCount,
@@ -8,7 +8,7 @@ import {
 } from '@/api/notification'
 import type { NotificationItem } from '@/types/notification'
 
-const POLL_INTERVAL_MS = 60_000
+const POLL_INTERVAL_MS = 20_000
 
 export function useNotifications() {
   const authStore = useAuthStore()
