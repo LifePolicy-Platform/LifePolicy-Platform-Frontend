@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <section class="page-with-hero">
     <PageHero title="理賠審核" subtitle="審核理賠案件與檢視審核歷程" />
 
@@ -288,7 +288,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import http from '@/api/http'
@@ -462,14 +462,29 @@ function formatDate(dateStr: string) {
   return dateStr.replace('T', ' ').substring(0, 19)
 }
 
-onMounted(async () => {
-  await loadAuditData()
-  const prefilledClaimNo = route.query.claimNo
-  if (typeof prefilledClaimNo === 'string' && prefilledClaimNo.trim()) {
+async function handleClaimNoQuery(claimNo: string | null | undefined) {
+  if (typeof claimNo === 'string' && claimNo.trim()) {
     router.replace({ query: {} })
-    const target = (rows.value as any[]).find(r => r.claimNo === prefilledClaimNo.trim())
+    filters.status = ''
+    filters.policyNo = ''
+    try {
+      const res = await http.get(`/api/admin/claim/${claimNo.trim()}`)
+      const claim = res.data?.DATA
+      if (claim?.policyNo) filters.policyNo = claim.policyNo
+      if (claim?.claimStatus) filters.status = claim.claimStatus
+    } catch {}
+    await loadAuditData()
+    const target = (rows.value as any[]).find((r: any) => r.claimNo === claimNo.trim())
     if (target) openAuditDialog(target)
+  } else {
+    await loadAuditData()
   }
+}
+
+onMounted(() => handleClaimNoQuery(route.query.claimNo as string))
+
+watch(() => route.query.claimNo, (claimNo) => {
+  if (claimNo) handleClaimNoQuery(claimNo as string)
 })
 
 // 新增：獲取當前登入使用者的 ROLE_CODE 權限

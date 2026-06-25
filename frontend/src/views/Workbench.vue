@@ -129,18 +129,24 @@ function isTabKey(value: unknown): value is TabKey {
   return typeof value === 'string' && tabKeys.includes(value as TabKey)
 }
 
-onMounted(async () => {
-  loadProducts()
-  if (isTabKey(route.query.tab)) activeTab.value = route.query.tab
-
-  const prefilledPolicyNo = route.query.policyNo
-  if (typeof prefilledPolicyNo === 'string' && prefilledPolicyNo.trim()) {
+async function handlePolicyNoQuery(policyNo: string | null | undefined) {
+  if (typeof policyNo === 'string' && policyNo.trim()) {
     activeTab.value = 'query'
-    queryForm.applicationId = prefilledPolicyNo.trim()
+    queryForm.applicationId = policyNo.trim()
     router.replace({ query: { tab: 'query' } })
     await nextTick()
     handleQuery({ silent: true })
   }
+}
+
+onMounted(async () => {
+  loadProducts()
+  if (isTabKey(route.query.tab)) activeTab.value = route.query.tab
+  await handlePolicyNoQuery(route.query.policyNo as string)
+})
+
+watch(() => route.query.policyNo, (policyNo) => {
+  if (policyNo) handlePolicyNoQuery(policyNo as string)
 })
 
 watch(activeTab, (tab) => {
