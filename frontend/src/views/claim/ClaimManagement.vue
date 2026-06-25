@@ -369,11 +369,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import type { QTableProps } from 'quasar'
-import axios from 'axios'
-import { watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import PageHero from '@/components/layout/PageHero.vue'
 
 // 將原本的 import axios 替換成這些 API 匯入
@@ -391,6 +390,8 @@ import {
 } from '@/api/claim'
 
 const $q = useQuasar()
+const route = useRoute()
+const router = useRouter()
 
 const filters = reactive({ status: '', policyNo: '', applyDate: '' })
 const statusOptions = [
@@ -948,9 +949,30 @@ async function preloadAgentOptions() {
   }
 }
 
-onMounted(() => {
-  loadData()
+async function handleClaimNoQuery(claimNo: string | null | undefined) {
+  if (typeof claimNo === 'string' && claimNo.trim()) {
+    router.replace({ query: {} })
+    filters.policyNo = ''
+    filters.status = 'APPROVED'
+    try {
+      const { fetchClaimDetail } = await import('@/api/claim')
+      const envelope = await fetchClaimDetail(claimNo.trim())
+      const claim = (envelope as any)?.DATA ?? envelope
+      if (claim?.policyNo) filters.policyNo = claim.policyNo
+      if (claim?.claimStatus) filters.status = claim.claimStatus
+    } catch {}
+    await loadData()
+  }
+}
+
+onMounted(async () => {
   preloadAgentOptions()
-  fetchOptionsData() // 預載所有客戶、保單與經辦資料
+  fetchOptionsData()
+  await handleClaimNoQuery(route.query.claimNo as string)
+  if (!route.query.claimNo) loadData()
+})
+
+watch(() => route.query.claimNo, (claimNo) => {
+  if (claimNo) handleClaimNoQuery(claimNo as string)
 })
 </script>

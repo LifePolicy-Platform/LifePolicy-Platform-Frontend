@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <section class="page-with-hero">
     <PageHero title="理賠審核" subtitle="審核理賠案件與檢視審核歷程" />
 
@@ -288,10 +288,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
-import axios from 'axios'
+import http from '@/api/http'
 import type { QTableColumn } from 'quasar'
 import PageHero from '@/components/layout/PageHero.vue'
 const route = useRoute()
@@ -329,7 +329,7 @@ const activeTab = ref('detail') // 預設進來彈窗時，停在「案件詳情
 async function loadAuditData() {
   loading.value = true
   try {
-    const res = await axios.get('/api/admin/claim-audit/list', { params: filters })
+    const res = await http.get('/api/admin/claim-audit/list', { params: filters })
     rows.value = res.data.DATA
   } catch (err) {
     $q.notify({ type: 'negative', message: '讀取審核列表失敗' })
@@ -346,11 +346,11 @@ async function openAuditDialog(row: any) {
   try {
     // 2. 關鍵：重新呼叫後端 API 取得完整資訊 (包含 JOIN 的 effectDate 等欄位)
     // 假設你有一個 API 可以透過 claimNo 抓取完整資料
-    const res = await axios.get(`/api/admin/claim/${row.claimNo}`)
+    const res = await http.get(`/api/admin/claim/${row.claimNo}`)
     auditDialog.form = res.data.DATA
     
     // 3. 獲取審核 Log
-    const logRes = await axios.get(`/api/admin/claim-audit/logs/${row.claimNo}`)
+    const logRes = await http.get(`/api/admin/claim-audit/logs/${row.claimNo}`)
     historyLogs.value = logRes.data.DATA
     
   } catch (err) {
@@ -419,7 +419,7 @@ auditForm.action = actionType
         }
       }
 
-      await axios.put('/api/admin/claim-audit/decision', {
+      await http.put('/api/admin/claim-audit/decision', {
         claimNo: auditDialog.form.claimNo,
         action: auditForm.action,
         // 新的：APPROVED 和 PENDING 保留金額，只有 REJECTED/RETURN 才送 null
@@ -462,14 +462,33 @@ function formatDate(dateStr: string) {
   return dateStr.replace('T', ' ').substring(0, 19)
 }
 
-onMounted(async () => {
-  await loadAuditData()
-  const prefilledClaimNo = route.query.claimNo
-  if (typeof prefilledClaimNo === 'string' && prefilledClaimNo.trim()) {
+const SETTLED_STATUSES = ['APPROVED', 'REJECTED']
+
+async function handleClaimNoQuery(claimNo: string | null | undefined) {
+  if (typeof claimNo === 'string' && claimNo.trim()) {
     router.replace({ query: {} })
-    const target = (rows.value as any[]).find(r => r.claimNo === prefilledClaimNo.trim())
+    try {
+      const res = await http.get(`/api/admin/claim/${claimNo.trim()}`)
+      const claim = res.data?.DATA
+      if (claim && SETTLED_STATUSES.includes(claim.claimStatus)) {
+        router.push({ path: '/claim/ClaimManagement', query: { claimNo: claimNo.trim() } })
+        return
+      }
+      if (claim?.policyNo) filters.policyNo = claim.policyNo
+      if (claim?.claimStatus) filters.status = claim.claimStatus
+    } catch {}
+    await loadAuditData()
+    const target = (rows.value as any[]).find((r: any) => r.claimNo === claimNo.trim())
     if (target) openAuditDialog(target)
+  } else {
+    await loadAuditData()
   }
+}
+
+onMounted(() => handleClaimNoQuery(route.query.claimNo as string))
+
+watch(() => route.query.claimNo, (claimNo) => {
+  if (claimNo) handleClaimNoQuery(claimNo as string)
 })
 
 // 新增：獲取當前登入使用者的 ROLE_CODE 權限
