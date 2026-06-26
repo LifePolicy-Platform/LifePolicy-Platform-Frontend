@@ -183,15 +183,6 @@ const activeEntry = computed(() => {
         :done-color="stepColor(entry.statusCode)" :error-color="'negative'" :header-nav="false" />
     </q-stepper>
 
-    <div v-if="activeEntry" class="policy-history-stepper__detail">
-      <div v-if="activeEntry.remark" class="text-body2 text-grey-8">
-        {{ activeEntry.remark }}
-      </div>
-      <div v-if="activeEntry.handler" class="text-caption text-grey-6 q-mt-xs">
-        處理人：{{ activeEntry.handler }}
-      </div>
-      <q-badge v-if="activeEntry.active" color="grey-6" text-color="white" label="進行中" class="q-mt-sm" />
-    </div>
   </div>
 </template>
 
