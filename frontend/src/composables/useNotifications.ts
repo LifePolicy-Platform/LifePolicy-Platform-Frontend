@@ -1,4 +1,4 @@
-﻿import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import {
   fetchUnreadCount,

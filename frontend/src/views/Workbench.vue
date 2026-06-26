@@ -7,15 +7,11 @@ import type { ProductListItem1 } from '@/types/productMgmt'
 import type { PolicyRecord } from '@/types/policyApplication'
 import type { PolicyHistoryItem } from '@/types/policyMgmt'
 import PolicyHistoryTable from '@/components/policy/PolicyHistoryTable.vue'
-import PolicyHistoryTimeline from '@/components/policy/PolicyHistoryTimeline.vue'
-import PolicyDocumentPanel from '@/components/policy/PolicyDocumentPanel.vue'
 import {
   createPolicyApplication,
   queryPolicyApplications,
   updatePolicyApplication,
   reviewPolicyApplication,
-  uploadPolicyFile,
-  fetchMemberByIdentityCard,
 } from '@/api/policyApplication'
 import { fetchPolicyAprvLogs } from '@/api/policyAprvLog'
 import { fetchActiveProducts } from '@/api/product'
@@ -106,19 +102,16 @@ async function loadProducts() {
 
 // ---- q-select 用的選項 ----
 const genderOptions = [
-  { label: '男', value: 'MALE' },
-  { label: '女', value: 'FEMALE' }
+  { label: 'MALE', value: 'MALE' },
+  { label: 'FEMALE', value: 'FEMALE' }
 ]
-
-const ID_NO_PATTERN = /^[A-Z][0-9]{9}$/
-
-function normalizeIdNo(value: string): string {
-  return value.trim().toUpperCase()
-}
-
-function isValidIdNo(value: string): boolean {
-  return ID_NO_PATTERN.test(normalizeIdNo(value))
-}
+const relationshipOptions = [
+  { label: 'SELF', value: 'SELF' },
+  { label: 'SPOUSE', value: 'SPOUSE' },
+  { label: 'CHILD', value: 'CHILD' },
+  { label: 'PARENT', value: 'PARENT' },
+  { label: 'OTHER', value: 'OTHER' }
+]
 const statusOptions = [
   { label: '全部', value: '' },
   { label: APPLICATION_STATUS_LABEL.PENDING, value: 'PENDING' },
@@ -141,24 +134,9 @@ function isTabKey(value: unknown): value is TabKey {
   return typeof value === 'string' && tabKeys.includes(value as TabKey)
 }
 
-async function handlePolicyNoQuery(policyNo: string | null | undefined) {
-  if (typeof policyNo === 'string' && policyNo.trim()) {
-    activeTab.value = 'query'
-    queryForm.applicationId = policyNo.trim()
-    router.replace({ query: { tab: 'query' } })
-    await nextTick()
-    handleQuery({ silent: true })
-  }
-}
-
-onMounted(async () => {
+onMounted(() => {
   loadProducts()
   if (isTabKey(route.query.tab)) activeTab.value = route.query.tab
-  await handlePolicyNoQuery(route.query.policyNo as string)
-})
-
-watch(() => route.query.policyNo, (policyNo) => {
-  if (policyNo) handlePolicyNoQuery(policyNo as string)
 })
 
 watch(activeTab, (tab) => {
@@ -982,25 +960,9 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
               <template v-else>
                 <div class="form-grid q-mt-md">
                   <q-input v-model="createForm.applicantName" label="投保人姓名" outlined dense maxlength="50" />
-                  <q-input
-                    v-model="createForm.applicantIdNo"
-                    label="投保人身分證"
-                    outlined
-                    dense
-                    maxlength="10"
-                    @blur="autofillApplicantFromMember"
-                  />
                   <q-select v-model="createForm.applicantGender" label="投保人性別" outlined dense :options="genderOptions" emit-value map-options />
                   <q-input v-model="createForm.applicantBirthdate" label="投保人生日" outlined dense type="date" stack-label />
                   <q-input v-model="createForm.insuredName" label="被保人姓名" outlined dense maxlength="50" />
-                  <q-input
-                    v-model="createForm.insuredIdNo"
-                    label="被保人身分證"
-                    outlined
-                    dense
-                    maxlength="10"
-                    @blur="autofillInsuredFromMember"
-                  />
                   <q-select v-model="createForm.insuredGender" label="被保人性別" outlined dense :options="genderOptions" emit-value map-options />
                   <q-input v-model="createForm.insuredBirthdate" label="被保人生日" outlined dense type="date" stack-label />
                   <q-input v-model="createForm.contactPhone" label="聯絡電話" outlined dense maxlength="10" />
@@ -1518,7 +1480,8 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
               <div class="text-subtitle1 text-weight-bold q-mb-md workbench-insight__title">即時規則提示</div>
               <div class="hint-row"><span class="hint-label">保費比例</span><span>{{ premiumRatioHint }}</span></div>
               <div class="hint-row"><span class="hint-label">核保風險等級</span><span>{{ riskLevelHint }}</span></div>
-              <div class="hint-row"><span class="hint-label">重複投保預警</span><span :class="duplicateWarningClass">{{ duplicateWarning }}</span></div>
+              <div class="hint-row"><span class="hint-label">重複投保預警</span><span>{{ duplicateWarning }}</span></div>
+              <div class="hint-row hint-row--last"><span class="hint-label">文件檢核</span><span>{{ documentHint }}</span></div>
             </q-card-section>
           </q-card>
 
