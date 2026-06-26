@@ -54,7 +54,7 @@
       <template v-slot:body-cell-claimStatus="props">
         <q-td :props="props">
           <q-badge :color="getStatusColor(props.value)" text-color="white" class="q-pa-xs text-weight-medium">
-            {{ props.value }}
+            {{ getStatusLabel(props.value) }} 
           </q-badge>
         </q-td>
       </template>
@@ -62,7 +62,15 @@
       <template v-slot:body-cell-actions="props">
         <q-td :props="props" class="q-gutter-xs">
           <q-btn size="sm" color="info" flat icon="visibility" label="詳情" @click="viewDetail(props.row)" />
-          <q-btn size="sm" color="warning" flat icon="edit" label="修改" @click="openDialog(props.row)" />
+          <!--<q-btn size="sm" color="warning" flat icon="edit" label="修改" @click="openDialog(props.row)" /> -->
+           <q-btn 
+  size="sm" 
+  :color="props.row.claimStatus === 'RETURN' ? 'orange-8' : 'warning'" 
+  flat 
+  icon="edit" 
+  :label="props.row.claimStatus === 'RETURN' ? '補件' : '修改'" 
+  @click="openDialog(props.row)" 
+/>
           <!-- <q-btn size="sm" color="negative" flat icon="delete" label="刪除" :disabled="props.row.claimStatus !== 'PENDING'" @click="confirmDelete(props.row.claimNo)" /> -->
         </q-td>
       </template>
@@ -198,43 +206,6 @@
             />
           </div>
 
-          <!-- 經辦人員區塊：新增模式下為下拉選單(預設帶入登入者)，詳情/修改模式下維持原樣 -->
-          <!-- <div :class="displayedAgentName ? 'col-6' : 'col-12'">
-            <q-select
-              v-if="!dialog.form.claimNo && !dialog.isView"
-              v-model="dialog.form.agentId"
-              :options="agentOptions"
-              option-value="agentId"
-              option-label="agentName"
-              emit-value
-              map-options
-              label="負責經辦人"
-              dense
-              outlined
-              @update:model-value="onAgentSelect"
-            >
-              <template v-slot:option="scope">
-                <q-item v-bind="scope.itemProps">
-                  <q-item-section>
-                    <q-item-label>[{{ scope.opt.agentId }}] {{ scope.opt.agentName }}</q-item-label>
-                  </q-item-section>
-                </q-item>
-              </template>
-              <template v-slot:selected-item="scope">
-                <span v-if="scope.opt">[{{ scope.opt.agentId }}] {{ scope.opt.agentName }}</span>
-                <span v-else-if="dialog.form.agentId">[{{ dialog.form.agentId }}] {{ dialog.form.agentName }}</span>
-              </template>
-            </q-select>
-            <q-input
-              v-else
-              v-model.number="dialog.form.agentId"
-              type="number"
-              label="經辦人員 ID"
-              dense
-              outlined
-              :readonly="dialog.isView"
-            />
-          </div> -->
 
           <!-- 經辦人員選擇區塊 -->
 <div class="col-12">
@@ -394,11 +365,11 @@ const $q = useQuasar()
 
 const filters = reactive({ status: '', policyNo: '', applyDate: '' })
 const statusOptions = [
-  { label: '最新案件待處理 (SUBMIT)', value: 'SUBMIT' },
-  { label: '審核中 (PENDING)', value: 'PENDING' },
-  { label: '已結案-核准 (APPROVED)', value: 'APPROVED' },
-  { label: '已結案-駁回 (REJECTED)', value: 'REJECTED' },
-  { label: '已被撤回須補件 (RETURN)', value: 'RETURN' }
+  { label: '新件待初審', value: 'SUBMIT' },
+  { label: '複審中', value: 'PENDING' },
+  { label: '已結案-核准', value: 'APPROVED' },
+  { label: '已結案-駁回', value: 'REJECTED' },
+  { label: '已被退回須補件', value: 'RETURN' }
 ]
 
 const loading = ref(false)
@@ -520,21 +491,6 @@ async function loadData() {
   }
 }
 
-// async function fetchOptionsData() {
-//   try {
-//     const [mRes, pRes, aRes] = await Promise.all([
-//       fetchMemberOptions(),
-//       fetchPolicyOptions(),
-//       fetchAgentOptions()
-//     ])
-//     memberOptions.value = mRes.DATA || []
-//     filteredMemberOptions.value = mRes.DATA || []
-//     policyOptions.value = pRes.DATA || []
-//     agentOptions.value = aRes.DATA || []
-//   } catch (err) {
-//     $q.notify({ type: 'negative', message: '載入選單失敗' })
-//   }
-// }
 
 // 這是更新後的 fetchOptionsData，直接複製替換掉你原本的函數
 async function fetchOptionsData() {
@@ -622,35 +578,6 @@ function onFileChange(event: Event, slot: 1 | 2) {
   target.value = ''
 }
 
-// 上傳理賠佐證文件（診斷書/收據），上傳成功後將檔名與路徑寫回表單
-// async function handleFileUpload(file: File, slot: 1 | 2) {
-//   const formData = new FormData()
-//   formData.append('file', file)
-
-//   if (slot === 1) uploading01.value = true
-//   else uploading02.value = true
-
-//   try {
-//     const res = await axios.post('/api/admin/claim/upload', formData, {
-//       headers: { 'Content-Type': 'multipart/form-data' }
-//     })
-//     if (res.data && res.data.DATA) {
-//       if (slot === 1) {
-//         dialog.form.file01Name = res.data.DATA.fileName
-//         dialog.form.file01Path = res.data.DATA.filePath
-//       } else {
-//         dialog.form.file02Name = res.data.DATA.fileName
-//         dialog.form.file02Path = res.data.DATA.filePath
-//       }
-//       $q.notify({ type: 'positive', message: '檔案上傳成功' })
-//     }
-//   } catch (err) {
-//     $q.notify({ type: 'negative', message: '檔案上傳失敗' })
-//   } finally {
-//     if (slot === 1) uploading01.value = false
-//     else uploading02.value = false
-//   }
-// }
 
 // 確保上面的 import 已經包含 uploadFileApi
 async function handleFileUpload(file: File, slot: 1 | 2) {
@@ -682,12 +609,6 @@ async function handleFileUpload(file: File, slot: 1 | 2) {
     else uploading02.value = false
   }
 }
-
-// // 選擇經辦人員時，同步帶入姓名顯示
-// function onAgentSelect(agentId: number) {
-//   const matched = agentOptions.value.find(a => a.agentId === agentId)
-//   dialog.form.agentName = matched ? matched.agentName : ''
-// }
 
 // 選擇經辦人員時，更新 agentName 到 form 中
 function onAgentSelect(agentId: number) {
@@ -782,6 +703,17 @@ async function viewDetail(row: ClaimModel) {
   }
 }
 
+function getStatusLabel(status: string): string {
+  const map: Record<string, string> = {
+    SUBMIT: '新件待初審',
+    PENDING: '複審中',
+    APPROVED: '已核准',
+    REJECTED: '已駁回',
+    RETURN: '退回須補件'
+  }
+  return map[status] || status // 如果後端回傳了未定義的狀態，則顯示原英文
+}
+
 async function saveClaim() {
   // 1. 原有的：檢查保單號碼與客戶 ID
   if (!dialog.form.policyNo || !dialog.form.memberId) {
@@ -804,11 +736,11 @@ async function saveClaim() {
   if (isSubmitting.value) return
   isSubmitting.value = true
 
-  // 🌟 核心防呆：如果是修改模式，且該案目前為「PENDING」狀態
-  if (dialog.form.claimNo && dialog.form.claimStatus === 'PENDING') {
+  // 🌟 核心防呆：如果是修改模式，且該案目前為「RETURN」狀態
+  if (dialog.form.claimNo && dialog.form.claimStatus === 'RETURN') {
     $q.dialog({
       title: '重新送審提示',
-      message: '本案目前處於「審核中 (PENDING)」階段。若確認進行修改儲存，案件狀態將重設為「新件待審 (SUBMIT)」並重新提交審核，是否確定？',
+      message: '若確認進行儲存補件，案件狀態將重設為「新件待審 (SUBMIT)」並重新提交審核，是否確定？',
       cancel: {
         label: '取消修改',
         color: 'grey'
@@ -840,6 +772,23 @@ async function saveClaim() {
     
     return // 阻斷下方直接儲存的流程
   }
+
+  // 🌟 RETURN 補件：儲存後自動把狀態改回 SUBMIT 重新送審
+if (dialog.form.claimNo && dialog.form.claimStatus === 'RETURN') {
+  if (isSubmitting.value) return
+  isSubmitting.value = true
+  try {
+    dialog.form.claimStatus = 'SUBMIT'
+    await updateClaimApi(dialog.form.claimNo, dialog.form)
+    $q.notify({ type: 'positive', message: '補件完成，已重新提交審核！' })
+    dialog.show = false
+    loadData()
+  } catch (err) {
+    $q.notify({ type: 'negative', message: '補件送出時發生錯誤' })
+  } finally {
+    isSubmitting.value = false
+  }
+}
 
   // 以下為常規儲存流程 (新增案件，或非 PENDING 狀態的修改案件)
   try {

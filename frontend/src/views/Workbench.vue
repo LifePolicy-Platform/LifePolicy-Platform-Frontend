@@ -28,6 +28,7 @@ import {
   SUPERVISOR_REVIEW_OPTIONS,
 } from '@/constants/applicationStatus'
 import { formatCurrency, parseCurrencyInput } from '@/utils/currency'
+import { formatCurrency, parseCurrencyInput } from '@/utils/currency'
 
 type ProductOption = { label: string; value: string }
 
@@ -142,8 +143,18 @@ function isTabKey(value: unknown): value is TabKey {
 }
 
 onMounted(async () => {
+onMounted(async () => {
   loadProducts()
   if (isTabKey(route.query.tab)) activeTab.value = route.query.tab
+
+  const prefilledPolicyNo = route.query.policyNo
+  if (typeof prefilledPolicyNo === 'string' && prefilledPolicyNo.trim()) {
+    activeTab.value = 'query'
+    queryForm.applicationId = prefilledPolicyNo.trim()
+    router.replace({ query: { tab: 'query' } })
+    await nextTick()
+    handleQuery({ silent: true })
+  }
 
   const prefilledPolicyNo = route.query.policyNo
   if (typeof prefilledPolicyNo === 'string' && prefilledPolicyNo.trim()) {
@@ -162,6 +173,7 @@ watch(activeTab, (tab) => {
 })
 
 const workflowSteps: { key: TabKey; icon: string; label: string; desc: string }[] = [
+  { key: 'create', icon: 'add_circle_outline', label: '新增案件', desc: '建立投保資料' },
   { key: 'create', icon: 'add_circle_outline', label: '新增案件', desc: '建立投保資料' },
   { key: 'query', icon: 'search', label: '查詢案件', desc: '搜尋與檢視' },
   { key: 'edit', icon: 'edit_note', label: '修改案件', desc: '補正退回件' },
@@ -213,6 +225,11 @@ function blankApplication() {
     pfile01Path: '',
     pfile02Name: '',
     pfile02Path: '',
+    contactPhone: '',
+    pfile01Name: '',
+    pfile01Path: '',
+    pfile02Name: '',
+    pfile02Path: '',
   }
 }
 
@@ -243,6 +260,10 @@ const reviewForm = reactive({
   pfile01Path: '',
   pfile02Name: '',
   pfile02Path: '',
+  pfile01Name: '',
+  pfile01Path: '',
+  pfile02Name: '',
+  pfile02Path: '',
 })
 
 const reviewTargetOptions = computed(() => {
@@ -256,6 +277,8 @@ const reviewTargetOptions = computed(() => {
 })
 
 const reviewStageTitle = computed(() => {
+  if (reviewForm.sourceStatus === 'SUBMIT') return '業務審核'
+  if (reviewForm.sourceStatus === 'PENDING') return '主管審核'
   if (reviewForm.sourceStatus === 'SUBMIT') return '業務審核'
   if (reviewForm.sourceStatus === 'PENDING') return '主管審核'
   return '審核作業'
@@ -286,6 +309,15 @@ const createUploading02 = ref(false)
 const editUploading01 = ref(false)
 const editUploading02 = ref(false)
 
+const createFile01Input = ref<HTMLInputElement | null>(null)
+const createFile02Input = ref<HTMLInputElement | null>(null)
+const editFile01Input = ref<HTMLInputElement | null>(null)
+const editFile02Input = ref<HTMLInputElement | null>(null)
+const createUploading01 = ref(false)
+const createUploading02 = ref(false)
+const editUploading01 = ref(false)
+const editUploading02 = ref(false)
+
 // ---- 查詢結果 ----
 const queryResults = ref<PolicyRecord[]>([])
 const queryMeta = ref('')
@@ -297,6 +329,8 @@ const columns = [
   { name: 'applicant', label: '投保人', field: 'APPLICANT_NAME', align: 'left' as const },
   { name: 'insured', label: '被保人', field: 'INSURED_NAME', align: 'left' as const },
   { name: 'product', label: '商品', field: 'PRODUCT_CODE', align: 'left' as const },
+  { name: 'sumInsured', label: '保額', field: 'SUM_INSURED', align: 'right' as const },
+  { name: 'annualPremium', label: '年繳保費', field: 'ANNUAL_PREMIUM', align: 'right' as const },
   { name: 'sumInsured', label: '保額', field: 'SUM_INSURED', align: 'right' as const },
   { name: 'annualPremium', label: '年繳保費', field: 'ANNUAL_PREMIUM', align: 'right' as const },
   { name: 'status', label: '狀態', field: 'APPLICATION_STATUS', align: 'left' as const },
@@ -371,6 +405,8 @@ const riskLevelHint = computed(() => {
   if (!hintForm.value.insuredBirthdate) return '尚未判定'
   const relationship = resolveRelationship(hintForm.value.applicantIdNo, hintForm.value.insuredIdNo)
   return evaluateRiskLevel(hintForm.value.insuredBirthdate, relationship, sumInsured, ratio)
+  const relationship = resolveRelationship(hintForm.value.applicantIdNo, hintForm.value.insuredIdNo)
+  return evaluateRiskLevel(hintForm.value.insuredBirthdate, relationship, sumInsured, ratio)
 })
 
 const duplicateWarning = ref('尚未檢查')
@@ -387,6 +423,7 @@ const documentHint = computed(() => {
   if (!canSupervisorReview.value) {
     return areDocumentsConfirmed() ? '文件檢核完成' : '主管審核時需完成文件檢核'
   }
+  return areDocumentsConfirmed() ? '文件檢核完成，可進入主管審核' : '主管審核前，請先完成文件勾選'
   return areDocumentsConfirmed() ? '文件檢核完成，可進入主管審核' : '主管審核前，請先完成文件勾選'
 })
 
@@ -411,6 +448,17 @@ function resolveRelationship(applicantIdNo: string, insuredIdNo: string): string
   return applicant && insured && applicant === insured ? 'SELF' : 'OTHER'
 }
 
+function findProduct(productCode: string): ProductListItem1 | undefined {
+  return products.value.find((product) => product.code === productCode)
+}
+
+/** 依身分證是否相同推導與被保人關係（後端仍必填此欄位） */
+function resolveRelationship(applicantIdNo: string, insuredIdNo: string): string {
+  const applicant = applicantIdNo.trim().toUpperCase()
+  const insured = insuredIdNo.trim().toUpperCase()
+  return applicant && insured && applicant === insured ? 'SELF' : 'OTHER'
+}
+
 function evaluateRiskLevel(insuredBirthdate: string, relationship: string, sumInsured: number, ratio: number): string {
   const age = insuredBirthdate ? calculateAge(insuredBirthdate) : 0
   if (age >= 60 || sumInsured >= 3000000 || relationship === 'PARENT' || relationship === 'CHILD') return 'HIGH'
@@ -419,6 +467,7 @@ function evaluateRiskLevel(insuredBirthdate: string, relationship: string, sumIn
 }
 
 function areDocumentsConfirmed(): boolean {
+  return reviewForm.docIdentity && reviewForm.docProposal
   return reviewForm.docIdentity && reviewForm.docProposal
 }
 
@@ -441,6 +490,10 @@ function validateApplication(
   form: ReturnType<typeof blankApplication>,
   options?: { requireFiles?: boolean },
 ): string[] {
+function validateApplication(
+  form: ReturnType<typeof blankApplication>,
+  options?: { requireFiles?: boolean },
+): string[] {
   const errors: string[] = []
   const idPattern = ID_NO_PATTERN
   const phonePattern = /^09\d{8}$/
@@ -453,6 +506,11 @@ function validateApplication(
   const today = new Date()
   if (form.applicantBirthdate && new Date(form.applicantBirthdate) > today) errors.push('投保人生日不可晚於今天')
   if (form.insuredBirthdate && new Date(form.insuredBirthdate) > today) errors.push('被保人生日不可晚於今天')
+
+  if (form.applicantBirthdate) {
+    const applicantAge = calculateAge(form.applicantBirthdate)
+    if (applicantAge < 18) errors.push('投保人須年滿 18 歲')
+  }
 
   if (form.applicantBirthdate) {
     const applicantAge = calculateAge(form.applicantBirthdate)
@@ -488,6 +546,27 @@ function validateApplication(
     if (!form.pfile01Path?.trim()) errors.push('請上傳身分證明')
     if (!form.pfile02Path?.trim()) errors.push('請上傳要保書')
   }
+  if (annualPremium > 1000000) errors.push('年繳保費不可超過 100 萬')
+
+  const product = findProduct(form.productCode)
+  if (product) {
+    if (form.insuredBirthdate) {
+      const insuredAge = calculateAge(form.insuredBirthdate)
+      if (insuredAge < product.minInsuredAge || insuredAge > product.maxInsuredAge) {
+        errors.push(`被保人年齡須介於 ${product.minInsuredAge}～${product.maxInsuredAge} 歲`)
+      }
+    }
+    if (sumInsured > 0 && (sumInsured < product.minSumInsured || sumInsured > product.maxSumInsured)) {
+      errors.push(
+        `保額須介於 ${product.minSumInsured.toLocaleString('zh-TW')}～${product.maxSumInsured.toLocaleString('zh-TW')}`,
+      )
+    }
+  }
+
+  if (options?.requireFiles) {
+    if (!form.pfile01Path?.trim()) errors.push('請上傳身分證明')
+    if (!form.pfile02Path?.trim()) errors.push('請上傳要保書')
+  }
 
   return errors
 }
@@ -497,12 +576,15 @@ function buildPayload(form: ReturnType<typeof blankApplication>) {
   const annualPremium = Number(form.annualPremium || 0)
   const premiumRatio = sumInsured > 0 ? annualPremium / sumInsured : 0
   const relationshipToInsured = resolveRelationship(form.applicantIdNo, form.insuredIdNo)
+  const relationshipToInsured = resolveRelationship(form.applicantIdNo, form.insuredIdNo)
 
+  const payload: Record<string, unknown> = {
   const payload: Record<string, unknown> = {
     APPLICANT_ID_NO: form.applicantIdNo.trim(),
     APPLICANT_NAME: form.applicantName.trim(),
     APPLICANT_GENDER: form.applicantGender,
     APPLICANT_BIRTHDATE: form.applicantBirthdate,
+    RELATIONSHIP_TO_INSURED: relationshipToInsured,
     RELATIONSHIP_TO_INSURED: relationshipToInsured,
     INSURED_ID_NO: form.insuredIdNo.trim(),
     INSURED_NAME: form.insuredName.trim(),
@@ -512,6 +594,78 @@ function buildPayload(form: ReturnType<typeof blankApplication>) {
     SUM_INSURED: sumInsured,
     ANNUAL_PREMIUM: annualPremium,
     CONTACT_PHONE: form.contactPhone.trim(),
+    RISK_LEVEL: evaluateRiskLevel(form.insuredBirthdate, relationshipToInsured, sumInsured, premiumRatio),
+    CREATED_BY: authStore.currentUser?.USERNAME ?? '',
+  }
+
+  if (form.pfile01Path?.trim()) {
+    payload.PFILE_01_NAME = form.pfile01Name
+    payload.PFILE_01_PATH = form.pfile01Path
+  }
+  if (form.pfile02Path?.trim()) {
+    payload.PFILE_02_NAME = form.pfile02Name
+    payload.PFILE_02_PATH = form.pfile02Path
+  }
+
+  return payload
+}
+
+function triggerPolicyFileSelect(target: 'create' | 'edit', slot: 1 | 2) {
+  if (target === 'create') {
+    if (slot === 1) createFile01Input.value?.click()
+    else createFile02Input.value?.click()
+    return
+  }
+  if (slot === 1) editFile01Input.value?.click()
+  else editFile02Input.value?.click()
+}
+
+function onPolicyFileChange(event: Event, target: 'create' | 'edit', slot: 1 | 2) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (file) {
+    handlePolicyFileUpload(file, target, slot)
+  }
+  input.value = ''
+}
+
+async function handlePolicyFileUpload(file: File, target: 'create' | 'edit', slot: 1 | 2) {
+  const uploadingFlag =
+    target === 'create'
+      ? slot === 1
+        ? createUploading01
+        : createUploading02
+      : slot === 1
+        ? editUploading01
+        : editUploading02
+
+  uploadingFlag.value = true
+  try {
+    const data = await uploadPolicyFile(file)
+    const form = target === 'create' ? createForm : editForm
+    if (slot === 1) {
+      form.pfile01Name = data.fileName
+      form.pfile01Path = data.filePath
+    } else {
+      form.pfile02Name = data.fileName
+      form.pfile02Path = data.filePath
+    }
+    notifySuccess('檔案上傳成功')
+  } catch {
+    notifyError('檔案上傳失敗，請稍後再試')
+  } finally {
+    uploadingFlag.value = false
+  }
+}
+
+function clearPolicyFile(target: 'create' | 'edit', slot: 1 | 2) {
+  const form = target === 'create' ? createForm : editForm
+  if (slot === 1) {
+    form.pfile01Name = ''
+    form.pfile01Path = ''
+  } else {
+    form.pfile02Name = ''
+    form.pfile02Path = ''
     RISK_LEVEL: evaluateRiskLevel(form.insuredBirthdate, relationshipToInsured, sumInsured, premiumRatio),
     CREATED_BY: authStore.currentUser?.USERNAME ?? '',
   }
@@ -623,6 +777,7 @@ async function handleQuery(options?: { silent?: boolean }) {
   if (!hasQueryCriteria()) {
     if (!options?.silent) {
       notifyError('查詢至少需要一個條件')
+      notifyError('查詢至少需要一個條件')
     }
     return
   }
@@ -699,6 +854,11 @@ function loadRecordToEdit(record: PolicyRecord) {
     pfile01Path: record.PFILE_01_PATH || '',
     pfile02Name: record.PFILE_02_NAME || '',
     pfile02Path: record.PFILE_02_PATH || '',
+    contactPhone: record.CONTACT_PHONE || '',
+    pfile01Name: record.PFILE_01_NAME || '',
+    pfile01Path: record.PFILE_01_PATH || '',
+    pfile02Name: record.PFILE_02_NAME || '',
+    pfile02Path: record.PFILE_02_PATH || '',
   })
   editLoaded.value = true
   activeTab.value = 'edit'
@@ -726,6 +886,10 @@ function loadRecordToReview(record: PolicyRecord) {
   reviewForm.pfile01Path = record.PFILE_01_PATH || ''
   reviewForm.pfile02Name = record.PFILE_02_NAME || ''
   reviewForm.pfile02Path = record.PFILE_02_PATH || ''
+  reviewForm.pfile01Name = record.PFILE_01_NAME || ''
+  reviewForm.pfile01Path = record.PFILE_01_PATH || ''
+  reviewForm.pfile02Name = record.PFILE_02_NAME || ''
+  reviewForm.pfile02Path = record.PFILE_02_PATH || ''
   reviewLoaded.value = true
   activeTab.value = 'review'
   notifySuccess(`已載入案件 ${record.APPLICATION_ID} 到審核區`)
@@ -747,11 +911,17 @@ function resetEditForm() {
   editLoaded.value = false
 }
 
+function resetEditForm() {
+  Object.assign(editForm, blankApplication())
+  editLoaded.value = false
+}
+
 async function handleEdit() {
   if (!editLoaded.value) {
     notifyError('請先從查詢結果載入要修改的案件')
     return
   }
+  const errors = validateApplication(editForm, { requireFiles: true })
   const errors = validateApplication(editForm, { requireFiles: true })
   if (errors.length) {
     notifyError(errors[0])
@@ -760,6 +930,12 @@ async function handleEdit() {
   submitting.value = true
   try {
     const result = await updatePolicyApplication(editForm.applicationId, buildPayload(editForm))
+    resetEditForm()
+    activeTab.value = 'query'
+    await nextTick()
+    if (hasQueried.value) {
+      await handleQuery({ silent: true })
+    }
     resetEditForm()
     activeTab.value = 'query'
     await nextTick()
@@ -786,6 +962,10 @@ function resetReviewForm() {
   reviewForm.pfile01Path = ''
   reviewForm.pfile02Name = ''
   reviewForm.pfile02Path = ''
+  reviewForm.pfile01Name = ''
+  reviewForm.pfile01Path = ''
+  reviewForm.pfile02Name = ''
+  reviewForm.pfile02Path = ''
   reviewLoaded.value = false
 }
 
@@ -800,9 +980,11 @@ async function handleReview() {
   }
   if (requiresRejectionReason.value && !reviewForm.rejectionReason.trim()) {
     notifyError(reviewForm.targetStatus === 'RETURN' ? '業務退件時必須填寫原因' : '主管駁回時必須填寫原因')
+    notifyError(reviewForm.targetStatus === 'RETURN' ? '業務退件時必須填寫原因' : '主管駁回時必須填寫原因')
     return
   }
   if (showDocumentCheck.value && !areDocumentsConfirmed()) {
+    notifyError('主管審核前，請先完成身分證明與要保書勾選')
     notifyError('主管審核前，請先完成身分證明與要保書勾選')
     return
   }
@@ -912,6 +1094,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
         <div class="workbench-hero__copy">
           <h2 class="page-hero__title">保單管理</h2>
           <p class="page-hero__subtitle workbench-hero__subtitle">新增申請、查詢案件、修改退回與審核保單</p>
+          <p class="page-hero__subtitle workbench-hero__subtitle">新增申請、查詢案件、修改退回與審核保單</p>
         </div>
 
         <nav class="workbench-workflow" aria-label="作業流程">
@@ -954,6 +1137,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
         <q-separator />
       </q-card> -->
       <div class="workbench-grid" :class="{ 'workbench-grid--no-aside': activeTab !== 'create' }">
+      <div class="workbench-grid" :class="{ 'workbench-grid--no-aside': activeTab !== 'create' }">
         <div class="workbench-main">
           <q-tab-panels v-model="activeTab" animated class="workbench-panels bg-transparent">
           <!-- 新增 -->
@@ -962,6 +1146,9 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
               <q-card-section>
               <div class="page-card__header">
                 <div>
+                  <p class="page-card__kicker">New policy application</p>
+                  <p style="color: red; margin-bottom: 5px;">* 所有欄位皆為必填 </p>
+                  <div class="page-card__title">新增投保案件</div>
                   <p class="page-card__kicker">New policy application</p>
                   <p style="color: red; margin-bottom: 5px;">* 所有欄位皆為必填 </p>
                   <div class="page-card__title">新增投保案件</div>
@@ -998,6 +1185,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   <q-select v-model="createForm.insuredGender" label="被保人性別" outlined dense :options="genderOptions" emit-value map-options />
                   <q-input v-model="createForm.insuredBirthdate" label="被保人生日" outlined dense type="date" stack-label />
                   <q-input v-model="createForm.contactPhone" label="聯絡電話" outlined dense maxlength="10" />
+                  <q-input v-model="createForm.contactPhone" label="聯絡電話" outlined dense maxlength="10" />
                   <q-select
                     v-model="createForm.productCode"
                     label="商品代碼"
@@ -1018,6 +1206,24 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                       </q-item>
                     </template>
                   </q-select>
+                  <q-input
+                    :model-value="formatCurrency(createForm.sumInsured, '')"
+                    label="保額"
+                    outlined
+                    dense
+                    stack-label
+                    inputmode="numeric"
+                    @update:model-value="createForm.sumInsured = parseCurrencyInput($event)"
+                  />
+                  <q-input
+                    :model-value="formatCurrency(createForm.annualPremium, '')"
+                    label="年繳保費"
+                    outlined
+                    dense
+                    stack-label
+                    inputmode="numeric"
+                    @update:model-value="createForm.annualPremium = parseCurrencyInput($event)"
+                  />
                   <q-input
                     :model-value="formatCurrency(createForm.sumInsured, '')"
                     label="保額"
@@ -1110,7 +1316,81 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   </div>
                 </div>
 
+
+                <div class="full-span q-mt-sm">
+                  <div class="text-subtitle2 text-weight-bold text-grey-8 q-mb-xs">
+                    上傳保單文件 <span class="text-grey-6 text-caption">（選填）</span>
+                  </div>
+                  <div class="row q-col-gutter-sm">
+                    <div class="col-12 col-md-6">
+                      <q-btn
+                        class="full-width"
+                        color="grey-7"
+                        outline
+                        icon="attach_file"
+                        :label="createUploading01 ? '上傳中...' : '上傳檔案'"
+                        :loading="createUploading01"
+                        no-caps
+                        @click="triggerPolicyFileSelect('create', 1)"
+                      />
+                      <input
+                        ref="createFile01Input"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        style="display: none"
+                        @change="onPolicyFileChange($event, 'create', 1)"
+                      />
+                      <div v-if="createForm.pfile01Path" class="row items-center no-wrap q-mt-xs q-gutter-xs">
+                        <span class="text-caption text-positive col">已上傳：{{ createForm.pfile01Name }}</span>
+                        <q-btn
+                          flat
+                          dense
+                          round
+                          color="negative"
+                          icon="close"
+                          size="sm"
+                          aria-label="移除檔案"
+                          @click="clearPolicyFile('create', 1)"
+                        />
+                      </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <q-btn
+                        class="full-width"
+                        color="grey-7"
+                        outline
+                        icon="attach_file"
+                        :label="createUploading02 ? '上傳中...' : '上傳檔案'"
+                        :loading="createUploading02"
+                        no-caps
+                        @click="triggerPolicyFileSelect('create', 2)"
+                      />
+                      <input
+                        ref="createFile02Input"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        style="display: none"
+                        @change="onPolicyFileChange($event, 'create', 2)"
+                      />
+                      <div v-if="createForm.pfile02Path" class="row items-center no-wrap q-mt-xs q-gutter-xs">
+                        <span class="text-caption text-positive col">已上傳：{{ createForm.pfile02Name }}</span>
+                        <q-btn
+                          flat
+                          dense
+                          round
+                          color="negative"
+                          icon="close"
+                          size="sm"
+                          aria-label="移除檔案"
+                          @click="clearPolicyFile('create', 2)"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div class="q-mt-md">
+                  <q-btn color="primary" unelevated label="送出新增" no-caps :loading="submitting" @click="handleCreate" />
                   <q-btn color="primary" unelevated label="送出新增" no-caps :loading="submitting" @click="handleCreate" />
                 </div>
               </template>
@@ -1124,6 +1404,8 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
               <q-card-section>
               <div class="page-card__header">
                 <div>
+                  <p class="page-card__kicker">Search Policy Cases</p>
+                  <div class="page-card__title">查詢保單案件</div>
                   <p class="page-card__kicker">Search Policy Cases</p>
                   <div class="page-card__title">查詢保單案件</div>
                 </div>
@@ -1157,6 +1439,9 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                       </q-item>
                     </template>
                   </q-select>
+                  <q-input v-model="queryForm.insuredIdNo" label="被保人身分證" outlined dense />
+                  <q-select v-model="queryForm.applicationStatus" label="申請狀態" outlined dense :options="statusOptions" emit-value map-options />
+                  <q-select v-model="queryForm.sortDirection" label="排序方向" outlined dense :options="sortOptions" emit-value map-options />
                   <q-input v-model="queryForm.insuredIdNo" label="被保人身分證" outlined dense />
                   <q-select v-model="queryForm.applicationStatus" label="申請狀態" outlined dense :options="statusOptions" emit-value map-options />
                   <q-select v-model="queryForm.sortDirection" label="排序方向" outlined dense :options="sortOptions" emit-value map-options />
@@ -1211,6 +1496,16 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                     <q-td :props="props">
                       <div>{{ props.row.PRODUCT_NAME || '—' }}</div>
                       <small class="text-grey-6">{{ props.row.PRODUCT_CODE }}</small>
+                    </q-td>
+                  </template>
+                  <template #body-cell-sumInsured="props">
+                    <q-td :props="props" class="text-right">
+                      <span class="workbench-amount">{{ formatCurrency(props.row.SUM_INSURED) }}</span>
+                    </q-td>
+                  </template>
+                  <template #body-cell-annualPremium="props">
+                    <q-td :props="props" class="text-right">
+                      <span class="workbench-amount">{{ formatCurrency(props.row.ANNUAL_PREMIUM) }}</span>
                     </q-td>
                   </template>
                   <template #body-cell-sumInsured="props">
@@ -1283,6 +1578,8 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                 <div>
                   <p class="page-card__kicker">Revise Returned Cases</p>
                   <div class="page-card__title">修改退回案件</div>
+                  <p class="page-card__kicker">Revise Returned Cases</p>
+                  <div class="page-card__title">修改退回案件</div>
                 </div>
               </div>
 
@@ -1321,6 +1618,24 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                       </q-item>
                     </template>
                   </q-select>
+                  <q-input
+                    :model-value="formatCurrency(editForm.sumInsured, '')"
+                    label="保額"
+                    outlined
+                    dense
+                    stack-label
+                    inputmode="numeric"
+                    @update:model-value="editForm.sumInsured = parseCurrencyInput($event)"
+                  />
+                  <q-input
+                    :model-value="formatCurrency(editForm.annualPremium, '')"
+                    label="年繳保費"
+                    outlined
+                    dense
+                    stack-label
+                    inputmode="numeric"
+                    @update:model-value="editForm.annualPremium = parseCurrencyInput($event)"
+                  />
                   <q-input
                     :model-value="formatCurrency(editForm.sumInsured, '')"
                     label="保額"
@@ -1419,7 +1734,86 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   />
                 </div>
 
+
+                <div class="full-span q-mt-sm">
+                  <div class="text-subtitle2 text-weight-bold text-grey-8 q-mb-xs">上傳保單文件（必填）</div>
+                  <div class="row q-col-gutter-sm">
+                    <div class="col-12 col-md-6">
+                      <q-btn
+                        class="full-width"
+                        color="grey-7"
+                        outline
+                        icon="attach_file"
+                        :label="editUploading01 ? '上傳中...' : '上傳檔案 *'"
+                        :loading="editUploading01"
+                        no-caps
+                        @click="triggerPolicyFileSelect('edit', 1)"
+                      />
+                      <input
+                        ref="editFile01Input"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        style="display: none"
+                        @change="onPolicyFileChange($event, 'edit', 1)"
+                      />
+                      <div v-if="editForm.pfile01Path" class="row items-center no-wrap q-mt-xs q-gutter-xs">
+                        <span class="text-caption text-positive col">已上傳：{{ editForm.pfile01Name }}</span>
+                        <q-btn
+                          flat
+                          dense
+                          round
+                          color="negative"
+                          icon="close"
+                          size="sm"
+                          aria-label="移除檔案"
+                          @click="clearPolicyFile('edit', 1)"
+                        />
+                      </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <q-btn
+                        class="full-width"
+                        color="grey-7"
+                        outline
+                        icon="attach_file"
+                        :label="editUploading02 ? '上傳中...' : '上傳檔案 *'"
+                        :loading="editUploading02"
+                        no-caps
+                        @click="triggerPolicyFileSelect('edit', 2)"
+                      />
+                      <input
+                        ref="editFile02Input"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        style="display: none"
+                        @change="onPolicyFileChange($event, 'edit', 2)"
+                      />
+                      <div v-if="editForm.pfile02Path" class="row items-center no-wrap q-mt-xs q-gutter-xs">
+                        <span class="text-caption text-positive col">已上傳：{{ editForm.pfile02Name }}</span>
+                        <q-btn
+                          flat
+                          dense
+                          round
+                          color="negative"
+                          icon="close"
+                          size="sm"
+                          aria-label="移除檔案"
+                          @click="clearPolicyFile('edit', 2)"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <PolicyDocumentPanel
+                    class="q-mt-sm"
+                    :file01-name="editForm.pfile01Name"
+                    :file01-path="editForm.pfile01Path"
+                    :file02-name="editForm.pfile02Name"
+                    :file02-path="editForm.pfile02Path"
+                  />
+                </div>
+
                 <div class="q-mt-md">
+                  <q-btn color="primary" unelevated label="送出修改" no-caps :loading="submitting" @click="handleEdit" />
                   <q-btn color="primary" unelevated label="送出修改" no-caps :loading="submitting" @click="handleEdit" />
                 </div>
               </template>
@@ -1434,6 +1828,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
               <div class="page-card__header">
                 <div>
                   <p class="page-card__kicker">Review Policy Cases</p>
+                  <p class="page-card__kicker">Review Policy Cases</p>
                   <div class="page-card__title">{{ reviewStageTitle }}</div>
                 </div>
               </div>
@@ -1442,6 +1837,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                 此功能僅開放 APPLICANT（業務審核）或 REVIEWER（主管審核）使用。
               </q-banner>
               <q-banner v-else-if="!reviewLoaded" rounded class="bg-amber-1 text-brown-8 q-mt-md">
+                請先從查詢結果帶入待審案件：業務審核 、主管審核。
                 請先從查詢結果帶入待審案件：業務審核 、主管審核。
               </q-banner>
               <q-banner v-else-if="!canPerformLoadedReview" rounded class="bg-amber-1 text-brown-8 q-mt-md">
@@ -1452,6 +1848,17 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                 <q-banner rounded class="bg-blue-1 text-blue-9 q-mt-md">
                   目前狀態：{{ applicationStatusLabel(reviewForm.sourceStatus) }}
                 </q-banner>
+
+                <q-card flat bordered class="q-mt-md q-pa-md">
+                  <div class="text-weight-bold text-grey-8 q-mb-sm">保單文件確認</div>
+                  <PolicyDocumentPanel
+                    :file01-name="reviewForm.pfile01Name"
+                    :file01-path="reviewForm.pfile01Path"
+                    :file02-name="reviewForm.pfile02Name"
+                    :file02-path="reviewForm.pfile02Path"
+                  />
+                </q-card>
+
 
                 <q-card flat bordered class="q-mt-md q-pa-md">
                   <div class="text-weight-bold text-grey-8 q-mb-sm">保單文件確認</div>
@@ -1483,9 +1890,11 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                     v-model="reviewForm.rejectionReason"
                     class="full-span"
                     :label="reviewForm.targetStatus === 'RETURN' ? '退件原因' : '駁回原因'"
+                    :label="reviewForm.targetStatus === 'RETURN' ? '退件原因' : '駁回原因'"
                     outlined
                     type="textarea"
                     rows="3"
+                    :hint="reviewForm.targetStatus === 'RETURN' ? '業務退件時請填寫原因 *' : '主管駁回時請填寫原因 *'"
                     :hint="reviewForm.targetStatus === 'RETURN' ? '業務退件時請填寫原因 *' : '主管駁回時請填寫原因 *'"
                   />
                 </div>
@@ -1506,6 +1915,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
         </q-tab-panels>
         </div>
 
+        <aside v-if="activeTab === 'create'" class="workbench-aside">
         <aside v-if="activeTab === 'create'" class="workbench-aside">
           <q-card flat class="page-card page-card--accent workbench-insight workbench-insight--rules">
             <q-card-section>
@@ -1536,6 +1946,10 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
                   <q-item-section>
                     <q-item-label class="text-weight-bold">{{ p.code }}</q-item-label>
                     <q-item-label>{{ p.name }}</q-item-label>
+                    <q-item-label caption>年齡 {{ p.minInsuredAge }}-{{ p.maxInsuredAge }}</q-item-label>
+                    <q-item-label caption>
+                      保額 {{ formatCurrency(p.minSumInsured) }} ~ {{ formatCurrency(p.maxSumInsured) }}
+                    </q-item-label>
                     <q-item-label caption>年齡 {{ p.minInsuredAge }}-{{ p.maxInsuredAge }}</q-item-label>
                     <q-item-label caption>
                       保額 {{ formatCurrency(p.minSumInsured) }} ~ {{ formatCurrency(p.maxSumInsured) }}
@@ -1738,6 +2152,10 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
   grid-template-columns: minmax(0, 1fr);
 }
 
+.workbench-grid--no-aside {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .workbench-main {
   min-width: 0;
 }
@@ -1916,6 +2334,11 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
 
 .workbench-product-more {
   border-top: 1px dashed var(--wb-border);
+}
+
+.workbench-amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
 }
 
 .workbench-amount {
