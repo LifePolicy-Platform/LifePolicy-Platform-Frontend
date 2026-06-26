@@ -532,7 +532,7 @@ function viewPdf(path: string | undefined) {
     return;
   }
 
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8085';
   const cleanBase = baseUrl.replace(/\/$/, '');
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   const fullUrl = `${cleanBase}${cleanPath}`;

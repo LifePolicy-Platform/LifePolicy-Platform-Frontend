@@ -31,6 +31,7 @@ const achievementGap = computed(() =>
       title="首頁 數據分析"
       subtitle="今年業績概況、投保目標與保單申請趨勢"
     />
+    <PageHero compact title="首頁 數據分析" subtitle="今年業績概況、投保目標與保單申請趨勢" />
 
     <div class="home-body">
       <q-banner v-if="errorMessage" rounded class="bg-red-1 text-red-8">
@@ -39,67 +40,27 @@ const achievementGap = computed(() =>
 
       <div v-else class="home-dashboard" :class="{ 'home-dashboard--loading': isLoading }">
         <div class="home-grid home-grid--stats">
-          <DashboardStatCard
-            title="今年業績"
-            :value="formatCurrency(yearlyPerformance.amount)"
-            :subtitle="yearlyPerformance.subtitle"
-            :trend="yearlyPerformance.trend"
-            :trend-label="yearlyPerformance.trendLabel"
-            icon="payments"
-          />
-          <DashboardStatCard
-            title="月目標（件）"
-            :value="`${insuranceGoal.monthlyTarget}`"
-            subtitle="本月投保目標件數"
-            icon="flag"
-          />
-          <DashboardStatCard
-            title="目前達成數"
-            :value="`${insuranceGoal.currentAchieved}`"
-            subtitle="本月核准並計入業績"
-            icon="check_circle"
-          />
-          <DashboardStatCard
-            title="達成率"
-            :value="`${insuranceGoal.achievementRate}%`"
+          <DashboardStatCard title="今年業績" :value="formatCurrency(yearlyPerformance.amount)"
+            :subtitle="yearlyPerformance.subtitle" :trend="yearlyPerformance.trend"
+            :trend-label="yearlyPerformance.trendLabel" icon="payments" />
+          <DashboardStatCard title="月目標（件）" :value="`${insuranceGoal.monthlyTarget}`" subtitle="本月投保目標件數" icon="flag" />
+          <DashboardStatCard title="目前達成數" :value="`${insuranceGoal.currentAchieved}`" subtitle="本月核准並計入業績"
+            icon="check_circle" />
+          <DashboardStatCard title="達成率" :value="`${insuranceGoal.achievementRate}%`"
             :subtitle="achievementGap > 0 ? `尚差 ${achievementGap} 件達標` : '已達成月目標'"
-            :progress="insuranceGoal.achievementRate"
-            icon="trending_up"
-          />
+            :progress="insuranceGoal.achievementRate" icon="trending_up" />
         </div>
 
         <div class="home-grid home-grid--pair">
-          <DashboardLineChart
-            title="當月申請保單"
-            subtitle="申請件數趨勢"
-            :data="monthApplications"
-            y-axis-label="件數"
-          />
-          <DashboardBarChart
-            title="保單狀態分布"
-            subtitle="今年申請狀態"
-            :data="policyStatusDistribution"
-            y-axis-label="件數"
-          />
+          <DashboardLineChart title="當月申請保單" subtitle="申請件數趨勢" :data="monthApplications" y-axis-label="件數" />
+          <DashboardBarChart title="保單狀態分布" subtitle="今年申請狀態" :data="policyStatusDistribution" y-axis-label="件數" />
         </div>
 
         <div class="home-grid home-grid--pair">
-          <DashboardBarChart
-            title="商品種類銷售量"
-            subtitle="今年商品銷售分布"
-            :data="productCategorySales"
-            y-axis-label="件數"
-          />
+          <DashboardBarChart title="商品種類銷售量" subtitle="今年商品銷售分布" :data="productCategorySales" y-axis-label="件數" />
           <div class="home-side-stats">
-            <DashboardStatCard
-              v-for="stat in sideStats"
-              :key="stat.title"
-              dense
-              :title="stat.title"
-              :value="formatStatValue(stat.count)"
-              :subtitle="stat.subtitle"
-              :trend="stat.trend"
-            />
+            <DashboardStatCard v-for="stat in sideStats" :key="stat.title" dense :title="stat.title"
+              :value="formatStatValue(stat.count)" :subtitle="stat.subtitle" :trend="stat.trend" />
           </div>
         </div>
       </div>

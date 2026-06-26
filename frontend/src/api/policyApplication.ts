@@ -1,5 +1,6 @@
 import { requestJson } from '@/api/http'
 import http from '@/api/http'
+import type { ApiEnvelope } from '@/types/auth'
 import type {
   PolicyCreateResult,
   PolicyQueryResult,
@@ -77,4 +78,20 @@ export async function downloadPolicyFile(path?: string | null, filename?: string
 export async function fetchIncompleteApplications(): Promise<PolicyRecord[]> {
   const response = await requestJson<PolicyRecord[]>(`${BASE}/incomplete`, 'GET')
   return response.DATA ?? []
+}
+
+export type MemberProfile = {
+  MEMBER_ID?: number
+  MEMBER_NAME?: string
+  GENDER?: string
+  BIRTHDAY?: string
+  CONTACT_PHONE?: string
+}
+
+export async function fetchMemberByIdentityCard(identityCard: string): Promise<MemberProfile | null> {
+  const response = await http.get<ApiEnvelope<MemberProfile | null>>(
+    `${BASE}/members/by-identity-card`,
+    { params: { identityCard: identityCard.trim().toUpperCase() } },
+  )
+  return response.data.DATA ?? null
 }

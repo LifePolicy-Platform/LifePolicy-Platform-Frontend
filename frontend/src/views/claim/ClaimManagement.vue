@@ -206,43 +206,6 @@
             />
           </div>
 
-          <!-- 經辦人員區塊：新增模式下為下拉選單(預設帶入登入者)，詳情/修改模式下維持原樣 -->
-          <!-- <div :class="displayedAgentName ? 'col-6' : 'col-12'">
-            <q-select
-              v-if="!dialog.form.claimNo && !dialog.isView"
-              v-model="dialog.form.agentId"
-              :options="agentOptions"
-              option-value="agentId"
-              option-label="agentName"
-              emit-value
-              map-options
-              label="負責經辦人"
-              dense
-              outlined
-              @update:model-value="onAgentSelect"
-            >
-              <template v-slot:option="scope">
-                <q-item v-bind="scope.itemProps">
-                  <q-item-section>
-                    <q-item-label>[{{ scope.opt.agentId }}] {{ scope.opt.agentName }}</q-item-label>
-                  </q-item-section>
-                </q-item>
-              </template>
-              <template v-slot:selected-item="scope">
-                <span v-if="scope.opt">[{{ scope.opt.agentId }}] {{ scope.opt.agentName }}</span>
-                <span v-else-if="dialog.form.agentId">[{{ dialog.form.agentId }}] {{ dialog.form.agentName }}</span>
-              </template>
-            </q-select>
-            <q-input
-              v-else
-              v-model.number="dialog.form.agentId"
-              type="number"
-              label="經辦人員 ID"
-              dense
-              outlined
-              :readonly="dialog.isView"
-            />
-          </div> -->
 
           <!-- 經辦人員選擇區塊 -->
 <div class="col-12">
@@ -528,21 +491,6 @@ async function loadData() {
   }
 }
 
-// async function fetchOptionsData() {
-//   try {
-//     const [mRes, pRes, aRes] = await Promise.all([
-//       fetchMemberOptions(),
-//       fetchPolicyOptions(),
-//       fetchAgentOptions()
-//     ])
-//     memberOptions.value = mRes.DATA || []
-//     filteredMemberOptions.value = mRes.DATA || []
-//     policyOptions.value = pRes.DATA || []
-//     agentOptions.value = aRes.DATA || []
-//   } catch (err) {
-//     $q.notify({ type: 'negative', message: '載入選單失敗' })
-//   }
-// }
 
 // 這是更新後的 fetchOptionsData，直接複製替換掉你原本的函數
 async function fetchOptionsData() {
@@ -630,35 +578,6 @@ function onFileChange(event: Event, slot: 1 | 2) {
   target.value = ''
 }
 
-// 上傳理賠佐證文件（診斷書/收據），上傳成功後將檔名與路徑寫回表單
-// async function handleFileUpload(file: File, slot: 1 | 2) {
-//   const formData = new FormData()
-//   formData.append('file', file)
-
-//   if (slot === 1) uploading01.value = true
-//   else uploading02.value = true
-
-//   try {
-//     const res = await axios.post('/api/admin/claim/upload', formData, {
-//       headers: { 'Content-Type': 'multipart/form-data' }
-//     })
-//     if (res.data && res.data.DATA) {
-//       if (slot === 1) {
-//         dialog.form.file01Name = res.data.DATA.fileName
-//         dialog.form.file01Path = res.data.DATA.filePath
-//       } else {
-//         dialog.form.file02Name = res.data.DATA.fileName
-//         dialog.form.file02Path = res.data.DATA.filePath
-//       }
-//       $q.notify({ type: 'positive', message: '檔案上傳成功' })
-//     }
-//   } catch (err) {
-//     $q.notify({ type: 'negative', message: '檔案上傳失敗' })
-//   } finally {
-//     if (slot === 1) uploading01.value = false
-//     else uploading02.value = false
-//   }
-// }
 
 // 確保上面的 import 已經包含 uploadFileApi
 async function handleFileUpload(file: File, slot: 1 | 2) {
@@ -690,12 +609,6 @@ async function handleFileUpload(file: File, slot: 1 | 2) {
     else uploading02.value = false
   }
 }
-
-// // 選擇經辦人員時，同步帶入姓名顯示
-// function onAgentSelect(agentId: number) {
-//   const matched = agentOptions.value.find(a => a.agentId === agentId)
-//   dialog.form.agentName = matched ? matched.agentName : ''
-// }
 
 // 選擇經辦人員時，更新 agentName 到 form 中
 function onAgentSelect(agentId: number) {
