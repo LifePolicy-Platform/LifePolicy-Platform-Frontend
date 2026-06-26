@@ -15,6 +15,7 @@ import {
   updatePolicyApplication,
   reviewPolicyApplication,
   uploadPolicyFile,
+  fetchMemberByIdentityCard,
 } from '@/api/policyApplication'
 import { fetchPolicyAprvLogs } from '@/api/policyAprvLog'
 import { fetchActiveProducts } from '@/api/product'
@@ -108,6 +109,16 @@ const genderOptions = [
   { label: '男', value: 'MALE' },
   { label: '女', value: 'FEMALE' }
 ]
+
+const ID_NO_PATTERN = /^[A-Z][0-9]{9}$/
+
+function normalizeIdNo(value: string): string {
+  return value.trim().toUpperCase()
+}
+
+function isValidIdNo(value: string): boolean {
+  return ID_NO_PATTERN.test(normalizeIdNo(value))
+}
 const statusOptions = [
   { label: '全部', value: '' },
   { label: APPLICATION_STATUS_LABEL.PENDING, value: 'PENDING' },
@@ -431,7 +442,7 @@ function validateApplication(
   options?: { requireFiles?: boolean },
 ): string[] {
   const errors: string[] = []
-  const idPattern = /^[A-Z][0-9]{9}$/
+  const idPattern = ID_NO_PATTERN
   const phonePattern = /^09\d{8}$/
 
   if (!idPattern.test(form.applicantIdNo)) errors.push('投保人身分證格式需為 1 個英文字母加 9 碼數字')
@@ -820,6 +831,40 @@ async function handleReview() {
   }
 }
 
+// ---- 會員資料自動帶入 ----
+async function autofillApplicantFromMember() {
+  const idNo = normalizeIdNo(createForm.applicantIdNo)
+  createForm.applicantIdNo = idNo
+  if (!isValidIdNo(idNo)) return
+
+  try {
+    const member = await fetchMemberByIdentityCard(idNo)
+    if (!member) return
+    if (member.MEMBER_NAME) createForm.applicantName = member.MEMBER_NAME
+    if (member.GENDER) createForm.applicantGender = member.GENDER
+    if (member.BIRTHDAY) createForm.applicantBirthdate = member.BIRTHDAY
+    if (member.CONTACT_PHONE) createForm.contactPhone = member.CONTACT_PHONE
+  } catch {
+    // 查無會員或 API 失敗時維持手動輸入
+  }
+}
+
+async function autofillInsuredFromMember() {
+  const idNo = normalizeIdNo(createForm.insuredIdNo)
+  createForm.insuredIdNo = idNo
+  if (!isValidIdNo(idNo)) return
+
+  try {
+    const member = await fetchMemberByIdentityCard(idNo)
+    if (!member) return
+    if (member.MEMBER_NAME) createForm.insuredName = member.MEMBER_NAME
+    if (member.GENDER) createForm.insuredGender = member.GENDER
+    if (member.BIRTHDAY) createForm.insuredBirthdate = member.BIRTHDAY
+  } catch {
+    // 查無會員或 API 失敗時維持手動輸入
+  }
+}
+
 // ---- 重複投保檢查 ----
 async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, currentApplicationId: string | null) {
   if (!form.applicantIdNo || !form.insuredIdNo || !form.productCode) {
@@ -931,11 +976,25 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
               <template v-else>
                 <div class="form-grid q-mt-md">
                   <q-input v-model="createForm.applicantName" label="投保人姓名" outlined dense maxlength="50" />
-                  <q-input v-model="createForm.applicantIdNo" label="投保人身分證" outlined dense maxlength="10" />
+                  <q-input
+                    v-model="createForm.applicantIdNo"
+                    label="投保人身分證"
+                    outlined
+                    dense
+                    maxlength="10"
+                    @blur="autofillApplicantFromMember"
+                  />
                   <q-select v-model="createForm.applicantGender" label="投保人性別" outlined dense :options="genderOptions" emit-value map-options />
                   <q-input v-model="createForm.applicantBirthdate" label="投保人生日" outlined dense type="date" stack-label />
                   <q-input v-model="createForm.insuredName" label="被保人姓名" outlined dense maxlength="50" />
-                  <q-input v-model="createForm.insuredIdNo" label="被保人身分證" outlined dense maxlength="10" />
+                  <q-input
+                    v-model="createForm.insuredIdNo"
+                    label="被保人身分證"
+                    outlined
+                    dense
+                    maxlength="10"
+                    @blur="autofillInsuredFromMember"
+                  />
                   <q-select v-model="createForm.insuredGender" label="被保人性別" outlined dense :options="genderOptions" emit-value map-options />
                   <q-input v-model="createForm.insuredBirthdate" label="被保人生日" outlined dense type="date" stack-label />
                   <q-input v-model="createForm.contactPhone" label="聯絡電話" outlined dense maxlength="10" />

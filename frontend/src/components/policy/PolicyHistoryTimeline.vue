@@ -8,11 +8,9 @@ const props = defineProps<{
   currentStatus?: string
 }>()
 
-type FlowStatusCode = ApplicationStatusCode
-
 type StepEntry = {
   key: string
-  statusCode: FlowStatusCode
+  statusCode: ApplicationStatusCode | string
   title: string
   time?: string
   handler?: string
@@ -31,11 +29,11 @@ function isErrorStatus(code: string): boolean {
   return code === 'RETURN' || code === 'REJECTED'
 }
 
-function stepColor(code: FlowStatusCode): string {
+function stepColor(code: string): string {
   return isErrorStatus(code) ? 'negative' : 'positive'
 }
 
-function stepActiveColor(code: FlowStatusCode): string {
+function stepActiveColor(code: string): string {
   return isErrorStatus(code) ? 'negative' : 'primary'
 }
 
@@ -47,145 +45,61 @@ function sortRows(rows: PolicyHistoryItem[]): PolicyHistoryItem[] {
   })
 }
 
-function buildRawEntries(rows: PolicyHistoryItem[], currentStatus?: string) {
-  const sortedRows = sortRows(rows)
-  const entries: Omit<StepEntry, 'done' | 'error' | 'active'>[] = []
-  const latestStatus = currentStatus || sortedRows[sortedRows.length - 1]?.statusCode || ''
-
-  for (const [index, row] of sortedRows.entries()) {
-    const code = row.statusCode
-    const next = sortedRows[index + 1]
-    const isLast = index === sortedRows.length - 1
-
-    if (code === 'SUBMIT') {
-      const resubmit = isResubmitLog(row)
-      entries.push({
-        key: `submit-${row.id ?? index}`,
-        statusCode: 'SUBMIT',
-        title: '申請送出',
-        time: row.time,
-        handler: row.handler,
-        remark: row.remark || (resubmit ? '補件後重新送審' : '業務送件'),
-        icon: resubmit ? 'replay' : 'send',
-      })
-
-      if (next && ['PENDING', 'APPROVED', 'REJECTED'].includes(next.statusCode || '')) {
-        entries.push({
-          key: `business-${row.id ?? index}`,
-          statusCode: 'SUBMIT',
-          title: '業務審核中',
-          time: next.time,
-          handler: next.handler,
-          remark:
-            next.statusCode === 'PENDING'
-              ? '業務審核通過，送交主管審核'
-              : '業務審核完成',
-          icon: 'manage_accounts',
-        })
-      } else if (isLast && latestStatus === 'SUBMIT') {
-        entries.push({
-          key: `business-active-${row.id ?? index}`,
-          statusCode: 'SUBMIT',
-          title: '業務審核中',
-          time: row.time,
-          handler: '—',
-          remark: '等待業務審核',
-          icon: 'hourglass_top',
-        })
-      }
-      continue
-    }
-
-    if (code === 'RETURN') {
-      entries.push({
-        key: `return-${row.id ?? index}`,
-        statusCode: 'RETURN',
-        title: '退回補件中',
-        time: row.time,
-        handler: row.handler,
-        remark: row.remark || '—',
-        icon: 'assignment_return',
-      })
-      continue
-    }
-
-    if (code === 'PENDING') {
-      entries.push({
-        key: `pending-${row.id ?? index}`,
-        statusCode: 'PENDING',
-        title: '主管審核中',
-        time: row.time,
-        handler: row.handler,
-        remark: row.remark || '等待主管審核',
-        icon: 'supervisor_account',
-      })
-      continue
-    }
-
-    if (code === 'REJECTED') {
-      entries.push({
-        key: `rejected-${row.id ?? index}`,
-        statusCode: 'REJECTED',
-        title: '審核駁回',
-        time: row.time,
-        handler: row.handler,
-        remark: row.remark || '—',
-        icon: 'cancel',
-      })
-      continue
-    }
-
-    if (code === 'APPROVED') {
-      entries.push({
-        key: `approved-${row.id ?? index}`,
-        statusCode: 'APPROVED',
-        title: '審核通過',
-        time: row.time,
-        handler: row.handler,
-        remark: row.remark || '主管核准',
-        icon: 'check_circle',
-      })
-      entries.push({
-        key: `effective-${row.id ?? index}`,
-        statusCode: 'APPROVED',
-        title: '保單生效',
-        time: row.time,
-        handler: row.handler,
-        remark: '保單已核准並生效',
-        icon: 'verified',
-      })
-    }
+function logTitle(row: PolicyHistoryItem): string {
+  const code = row.statusCode || ''
+  if (code === 'SUBMIT') {
+    return isResubmitLog(row) ? '補件後重新送審' : '申請送出'
   }
+  const titleMap: Record<string, string> = {
+    RETURN: '退回補件',
+    PENDING: '送主管審核',
+    APPROVED: '主管核准',
+    REJECTED: '主管駁回',
+  }
+  return titleMap[code] ?? row.status ?? code
+}
 
-  return { entries, latestStatus }
+function logIcon(row: PolicyHistoryItem): string {
+  const code = row.statusCode || ''
+  if (code === 'SUBMIT') {
+    return isResubmitLog(row) ? 'replay' : 'send'
+  }
+  const iconMap: Record<string, string> = {
+    RETURN: 'assignment_return',
+    PENDING: 'supervisor_account',
+    APPROVED: 'check_circle',
+    REJECTED: 'cancel',
+  }
+  return iconMap[code] ?? 'history'
+}
+
+function rowToEntry(row: PolicyHistoryItem, index: number): Omit<StepEntry, 'done' | 'error' | 'active'> {
+  return {
+    key: `log-${row.id ?? index}`,
+    statusCode: row.statusCode || '',
+    title: logTitle(row),
+    time: row.time,
+    handler: row.handler,
+    remark: row.remark && row.remark !== '—' ? row.remark : undefined,
+    icon: logIcon(row),
+  }
 }
 
 function resolveActiveIndex(
   entries: Omit<StepEntry, 'done' | 'error' | 'active'>[],
-  latestStatus: string,
+  currentStatus: string,
 ): number {
-  if (!entries.length) return 0
+  if (!entries.length) return -1
 
-  if (latestStatus === 'SUBMIT') {
-    const idx = entries.findIndex(
-      (e) => e.statusCode === 'SUBMIT' && e.title === '業務審核中' && e.remark === '等待業務審核',
-    )
-    if (idx >= 0) return idx
+  if (currentStatus === 'APPROVED' || currentStatus === 'REJECTED') {
+    return entries.length - 1
   }
 
-  if (latestStatus === 'PENDING') {
-    const idx = [...entries].reverse().findIndex((e) => e.statusCode === 'PENDING')
-    if (idx >= 0) return entries.length - 1 - idx
-  }
-
-  if (latestStatus === 'RETURN') {
-    const idx = [...entries].reverse().findIndex((e) => e.statusCode === 'RETURN')
-    if (idx >= 0) return entries.length - 1 - idx
-  }
-
-  if (latestStatus === 'REJECTED') {
-    const idx = [...entries].reverse().findIndex((e) => e.statusCode === 'REJECTED')
-    if (idx >= 0) return entries.length - 1 - idx
+  const matchStatus = currentStatus || entries[entries.length - 1]?.statusCode || ''
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    if (entries[i]?.statusCode === matchStatus) {
+      return i
+    }
   }
 
   return entries.length - 1
@@ -193,45 +107,52 @@ function resolveActiveIndex(
 
 function applyStepStates(
   entries: Omit<StepEntry, 'done' | 'error' | 'active'>[],
-  latestStatus: string,
+  currentStatus: string,
 ): StepEntry[] {
-  const activeIndex = resolveActiveIndex(entries, latestStatus)
-  const isTerminal = latestStatus === 'APPROVED' || latestStatus === 'REJECTED'
+  const status = currentStatus || entries[entries.length - 1]?.statusCode || ''
+  const activeIndex = resolveActiveIndex(entries, status)
+  const isTerminal = status === 'APPROVED' || status === 'REJECTED'
 
   return entries.map((entry, index) => {
     const isNegative = isErrorStatus(entry.statusCode)
-    const isActive = !isTerminal && index === activeIndex
+    const isLast = index === entries.length - 1
 
-    if (isNegative) {
+    if (isTerminal) {
+      const isFinalNegative = isLast && status === 'REJECTED'
       return {
         ...entry,
-        active: isActive,
-        done: false,
-        error: true,
+        active: false,
+        done: true,
+        error: isFinalNegative,
       }
     }
 
-    let done = false
-
-    if (isTerminal) {
-      done = latestStatus === 'APPROVED' || index < activeIndex
-    } else if (!isActive && index < activeIndex) {
-      done = true
+    const isActive = index === activeIndex
+    if (isActive) {
+      return {
+        ...entry,
+        active: true,
+        done: false,
+        error: isNegative,
+      }
     }
 
     return {
       ...entry,
-      active: isActive,
-      done: isActive ? false : done,
+      active: false,
+      done: true,
       error: false,
     }
   })
 }
 
 function buildEntries(rows: PolicyHistoryItem[], currentStatus?: string): StepEntry[] {
-  if (!rows.length) return []
-  const { entries, latestStatus } = buildRawEntries(rows, currentStatus)
-  return applyStepStates(entries, latestStatus)
+  const sortedRows = sortRows(rows)
+  if (!sortedRows.length) return []
+
+  const rawEntries = sortedRows.map((row, index) => rowToEntry(row, index))
+  const status = currentStatus || sortedRows[sortedRows.length - 1]?.statusCode || ''
+  return applyStepStates(rawEntries, status)
 }
 
 const stepEntries = computed(() => buildEntries(props.rows, props.currentStatus))
@@ -254,42 +175,22 @@ const activeEntry = computed(() => {
       流程進度
     </div>
 
-    <q-stepper
-      :model-value="activeStep"
-      flat
-      bordered
-      alternative-labels
-      color="positive"
-      done-color="positive"
-      active-color="primary"
-      error-color="negative"
-      class="policy-history-stepper__panel"
-    >
-      <q-step
-        v-for="entry in stepEntries"
-        :key="entry.key"
-        :name="entry.key"
-        :title="entry.title"
-        :caption="entry.time || '—'"
-        :icon="entry.icon"
-        :done="entry.done"
-        :error="entry.error"
-        :color="stepColor(entry.statusCode)"
-        :active-color="stepActiveColor(entry.statusCode)"
-        :done-color="stepColor(entry.statusCode)"
-        :error-color="'negative'"
-        :header-nav="false"
-      />
+    <q-stepper :model-value="activeStep" flat bordered alternative-labels color="positive" done-color="positive"
+      active-color="primary" error-color="negative" class="policy-history-stepper__panel">
+      <q-step v-for="entry in stepEntries" :key="entry.key" :name="entry.key" :title="entry.title"
+        :caption="entry.time || '—'" :icon="entry.icon" :done="entry.done" :error="entry.error"
+        :color="stepColor(entry.statusCode)" :active-color="stepActiveColor(entry.statusCode)"
+        :done-color="stepColor(entry.statusCode)" :error-color="'negative'" :header-nav="false" />
     </q-stepper>
 
     <div v-if="activeEntry" class="policy-history-stepper__detail">
-      <q-badge
-        v-if="activeEntry.active"
-        color="grey-6"
-        text-color="white"
-        label="進行中"
-        class="q-mt-xs"
-      />
+      <div v-if="activeEntry.remark" class="text-body2 text-grey-8">
+        {{ activeEntry.remark }}
+      </div>
+      <div v-if="activeEntry.handler" class="text-caption text-grey-6 q-mt-xs">
+        處理人：{{ activeEntry.handler }}
+      </div>
+      <q-badge v-if="activeEntry.active" color="grey-6" text-color="white" label="進行中" class="q-mt-sm" />
     </div>
   </div>
 </template>
@@ -321,7 +222,6 @@ const activeEntry = computed(() => {
   padding: 0;
 }
 
-/* Quasar 預設 --done 會強制 primary，需覆寫以讓 QStep done-color 生效 */
 .policy-history-stepper__panel :deep(.q-stepper__tab--done:not(.q-stepper__tab--error)) {
   color: var(--q-positive) !important;
 }
