@@ -7,10 +7,7 @@ import type { ProductListItem1 } from '@/types/productMgmt'
 import type { PolicyRecord } from '@/types/policyApplication'
 import type { PolicyHistoryItem } from '@/types/policyMgmt'
 import PolicyHistoryTable from '@/components/policy/PolicyHistoryTable.vue'
-<<<<<<< HEAD
 import PolicyHistoryTimeline from '@/components/policy/PolicyHistoryTimeline.vue'
-=======
->>>>>>> wei
 import PolicyDocumentPanel from '@/components/policy/PolicyDocumentPanel.vue'
 import {
   createPolicyApplication,
@@ -1456,11 +1453,7 @@ async function runDuplicateCheck(form: ReturnType<typeof blankApplication>, curr
               <div class="text-subtitle1 text-weight-bold q-mb-md workbench-insight__title">即時規則提示</div>
               <div class="hint-row"><span class="hint-label">保費比例</span><span>{{ premiumRatioHint }}</span></div>
               <div class="hint-row"><span class="hint-label">核保風險等級</span><span>{{ riskLevelHint }}</span></div>
-<<<<<<< HEAD
               <div class="hint-row"><span class="hint-label">重複投保預警</span><span :class="duplicateWarningClass">{{ duplicateWarning }}</span></div>
-=======
-              <div class="hint-row"><span class="hint-label">重複投保預警</span><span>{{ duplicateWarning }}</span></div>
->>>>>>> wei
             </q-card-section>
           </q-card>
 

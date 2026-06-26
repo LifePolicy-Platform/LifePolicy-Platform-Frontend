@@ -26,15 +26,7 @@ const achievementGap = computed(() =>
 
 <template>
   <section class="home-page">
-<<<<<<< HEAD
     <PageHero compact title="首頁 數據分析" subtitle="今年業績概況、投保目標與保單申請趨勢" />
-=======
-    <PageHero
-      compact
-      title="首頁 數據分析"
-      subtitle="今年業績概況、投保目標與保單申請趨勢"
-    />
->>>>>>> wei
 
     <div class="home-body">
       <q-banner v-if="errorMessage" rounded class="bg-red-1 text-red-8">
@@ -55,36 +47,12 @@ const achievementGap = computed(() =>
         </div>
 
         <div class="home-grid home-grid--pair">
-<<<<<<< HEAD
           <DashboardLineChart title="當月申請保單" subtitle="申請件數趨勢" :data="monthApplications" y-axis-label="件數" />
           <DashboardBarChart title="保單狀態分布" subtitle="今年申請狀態" :data="policyStatusDistribution" y-axis-label="件數" />
         </div>
 
         <div class="home-grid home-grid--pair">
           <DashboardBarChart title="商品種類銷售量" subtitle="今年商品銷售分布" :data="productCategorySales" y-axis-label="件數" />
-=======
-          <DashboardLineChart
-            title="當月申請保單"
-            subtitle="申請件數趨勢"
-            :data="monthApplications"
-            y-axis-label="件數"
-          />
-          <DashboardBarChart
-            title="保單狀態分布"
-            subtitle="今年申請狀態"
-            :data="policyStatusDistribution"
-            y-axis-label="件數"
-          />
-        </div>
-
-        <div class="home-grid home-grid--pair">
-          <DashboardBarChart
-            title="商品種類銷售量"
-            subtitle="今年商品銷售分布"
-            :data="productCategorySales"
-            y-axis-label="件數"
-          />
->>>>>>> wei
           <div class="home-side-stats">
             <DashboardStatCard v-for="stat in sideStats" :key="stat.title" dense :title="stat.title"
               :value="formatStatValue(stat.count)" :subtitle="stat.subtitle" :trend="stat.trend" />

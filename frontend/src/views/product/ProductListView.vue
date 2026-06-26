@@ -180,7 +180,6 @@ async function submitForm() {
     dialogOpen.value = false
     await reload()
   } catch (err: unknown) {
-<<<<<<< HEAD
     const axErr = err as { response?: { data?: { CODE?: string; MESSAGE?: string } }; message?: string }
     const code = axErr?.response?.data?.CODE
     const msg = axErr?.response?.data?.MESSAGE ?? (err instanceof Error ? err.message : '操作失敗')
@@ -188,14 +187,6 @@ async function submitForm() {
       fieldErrors.productCode = msg
     } else if (code === 'INS-PROD-4044') {
       fieldErrors.productName = msg
-=======
-    const axErr = err as { response?: { data?: { MESSAGE?: string } }; message?: string }
-    const msg = axErr?.response?.data?.MESSAGE ?? (err instanceof Error ? err.message : '操作失敗')
-    if (msg === 'Product code already exists') {
-      fieldErrors.productCode = '商品代碼已存在'
-    } else if (msg === 'Product name already exists') {
-      fieldErrors.productName = '商品名稱已存在'
->>>>>>> wei
     } else {
       dialogError.value = msg
     }
