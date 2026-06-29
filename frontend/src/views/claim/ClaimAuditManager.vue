@@ -311,7 +311,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import axios from 'axios'
@@ -446,7 +446,7 @@ async function submitDecision(actionType: string) {
       })
       $q.notify({ type: 'positive', message: '理賠核決與履歷更新成功！' })
       auditDialog.show = false
-      loadAuditData() // 刷新主清單
+      router.push({ path: '/claim/ClaimManagement' })
     } catch (err) {
       $q.notify({ type: 'negative', message: '提交審核決策時失敗' })
     }
@@ -501,7 +501,13 @@ function formatDate(dateStr: string) {
 }
 
 onMounted(async () => {
+  const prefilledPolicyNo = route.query.policyNo
+  if (typeof prefilledPolicyNo === 'string' && prefilledPolicyNo.trim()) {
+    filters.policyNo = prefilledPolicyNo.trim()
+  }
+
   await loadAuditData()
+
   const prefilledClaimNo = route.query.claimNo
   if (typeof prefilledClaimNo === 'string' && prefilledClaimNo.trim()) {
     router.replace({ query: {} })
@@ -509,6 +515,22 @@ onMounted(async () => {
     if (target) openAuditDialog(target)
   }
 })
+
+watch(
+  () => route.query.claimNo,
+  async (claimNo) => {
+    if (typeof claimNo === 'string' && claimNo.trim()) {
+      const policyNo = route.query.policyNo
+      if (typeof policyNo === 'string' && policyNo.trim()) {
+        filters.policyNo = policyNo.trim()
+      }
+      await loadAuditData()
+      router.replace({ query: {} })
+      const target = (rows.value as any[]).find((r: any) => r.claimNo === claimNo.trim())
+      if (target) openAuditDialog(target)
+    }
+  }
+)
 
 // 獲取當前登入使用者的 ROLE_CODE 權限
 function getUserRole(): string {

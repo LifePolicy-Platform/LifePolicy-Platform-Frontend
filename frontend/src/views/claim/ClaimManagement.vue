@@ -71,6 +71,15 @@
   :label="props.row.claimStatus === 'RETURN' ? '補件' : '修改'" 
   @click="openDialog(props.row)" 
 />
+          <q-btn
+            v-if="props.row.claimStatus === 'SUBMIT' || props.row.claimStatus === 'PENDING'"
+            size="sm"
+            color="teal-7"
+            flat
+            icon="gavel"
+            label="前往審核"
+            @click="goToAudit(props.row)"
+          />
           <!-- <q-btn size="sm" color="negative" flat icon="delete" label="刪除" :disabled="props.row.claimStatus !== 'PENDING'" @click="confirmDelete(props.row.claimNo)" /> -->
         </q-td>
       </template>
@@ -345,6 +354,7 @@ import { useQuasar } from 'quasar'
 import type { QTableProps } from 'quasar'
 import axios from 'axios'
 import { watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import PageHero from '@/components/layout/PageHero.vue'
 
 // 將原本的 import axios 替換成這些 API 匯入
@@ -362,6 +372,8 @@ import {
 } from '@/api/claim'
 
 const $q = useQuasar()
+const router = useRouter()
+const route = useRoute()
 
 const filters = reactive({ status: '', policyNo: '', applyDate: '' })
 const statusOptions = [
@@ -644,6 +656,13 @@ function openDatePicker() {
   }
 }
 
+function goToAudit(row: ClaimModel) {
+  router.push({
+    path: '/claim/ClaimAuditManager',
+    query: { claimNo: row.claimNo, policyNo: row.policyNo }
+  })
+}
+
 function resetFilters() {
   filters.status = ''
   filters.policyNo = ''
@@ -898,8 +917,22 @@ async function preloadAgentOptions() {
 }
 
 onMounted(() => {
+  const prefilledPolicyNo = route.query.policyNo
+  if (typeof prefilledPolicyNo === 'string' && prefilledPolicyNo.trim()) {
+    filters.policyNo = prefilledPolicyNo.trim()
+  }
   loadData()
   preloadAgentOptions()
-  fetchOptionsData() // 預載所有客戶、保單與經辦資料
+  fetchOptionsData()
 })
+
+watch(
+  () => route.query.policyNo,
+  (policyNo) => {
+    if (typeof policyNo === 'string' && policyNo.trim()) {
+      filters.policyNo = policyNo.trim()
+      loadData()
+    }
+  }
+)
 </script>

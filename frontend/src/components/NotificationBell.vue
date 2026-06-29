@@ -43,12 +43,37 @@ function handleDocumentClick(e: MouseEvent) {
 onMounted(() => document.addEventListener('click', handleDocumentClick))
 onUnmounted(() => document.removeEventListener('click', handleDocumentClick))
 
-async function handleClick(notifNo: number, refNo: string | null, notifType: string) {
+const CLAIM_RESULT_KEYWORDS = ['核准', '駁回', '退件']
+
+/** 若 refNo 是理賠號 (CLM...) 則打 API 換成保單號，否則直接回傳 */
+async function resolvePolicyNo(refNo: string): Promise<string> {
+  if (!refNo.startsWith('CLM')) return refNo
+  try {
+    const res = await fetch(`/api/admin/claim/${refNo}`)
+    const data = await res.json()
+    return data?.data?.policyNo ?? refNo
+  } catch {
+    return refNo
+  }
+}
+
+async function handleClick(notifNo: number, refNo: string | null, notifType: string, title: string) {
   await markAsRead(notifNo)
   close()
-  if (notifType === 'CLAIM') {
+
+  const isClaimResult =
+    notifType === 'CLAIM_RESULT' ||
+    (notifType === 'CLAIM' && CLAIM_RESULT_KEYWORDS.some(kw => title?.includes(kw)))
+
+  if (isClaimResult) {
+    // 結果通知 → ClaimManagement，新通知 refNo=policyNo，舊通知 refNo=claimNo 需換算
+    const policyNo = refNo ? await resolvePolicyNo(refNo) : null
+    router.push({ path: '/claim/ClaimManagement', query: policyNo ? { policyNo } : {} })
+  } else if (notifType === 'CLAIM') {
+    // 待審通知 → ClaimAuditManager，refNo=claimNo
     router.push({ path: '/claim/ClaimAuditManager', query: refNo ? { claimNo: refNo } : {} })
   } else if (refNo) {
+    // 保單通知 → policy-mgmt
     router.push({ path: '/policy-mgmt', query: { tab: 'query', policyNo: refNo } })
   }
 }
@@ -93,7 +118,7 @@ function formatTime(dateStr: string | null) {
           :key="n.notifNo"
           class="notif-item"
           :class="{ 'notif-item--unread': n.isRead === 0 }"
-          @click="handleClick(n.notifNo, n.refNo, n.notifType)"
+          @click="handleClick(n.notifNo, n.refNo, n.notifType, n.title)"
         >
           <div class="notif-item__title">{{ n.title }}</div>
           <div class="notif-item__content">{{ n.content }}</div>
