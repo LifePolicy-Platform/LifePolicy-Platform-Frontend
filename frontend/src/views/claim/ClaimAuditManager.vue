@@ -44,7 +44,7 @@
         </q-td>
       </template>
 
-      <!-- 🌟 修改：根據角色與當前狀態，動態呈現操作按鈕 -->
+      <!-- 操作按鈕動態呈現 -->
       <template v-slot:body-cell-actions="props">
         <q-td :props="props" class="q-gutter-xs">
           <!-- 符合審核關卡條件：進入審核 -->
@@ -114,7 +114,7 @@
               </q-card-section>
             </q-card>
 
-            <!-- 3. 審核人員填寫卡片 (修改：依據 isAuditState 決定呈現輸入框或純狀態文字) -->
+            <!-- 3. 審核人員填寫卡片 -->
             <q-card flat bordered class="bg-white col column no-wrap">
               <q-card-section class="q-pa-md column q-gutter-y-sm full-height col">
                 
@@ -164,7 +164,7 @@
                   </div>
                 </template>
                 
-                <!-- 操作按鈕群 (修改：只在可編輯審核狀態下顯示按鈕區塊) -->
+                <!-- 操作按鈕群 -->
                 <div v-if="isAuditState(auditDialog.form)" class="row justify-end q-gutter-sm q-mt-sm">
                   <!-- 經辦 (APPLICANT) 在 SUBMIT 狀態的按鈕 -->
                   <template v-if="getUserRole() === 'APPLICANT' && auditDialog.form.claimStatus === 'SUBMIT'">
@@ -229,11 +229,11 @@
                     <div class="col-6"><q-input v-model="auditDialog.form.memberName" label="客戶姓名" dense outlined readonly bg-color="grey-1" /></div>
                     <div class="col-6"><q-input v-model="auditDialog.form.productName" label="商品名稱" dense outlined readonly bg-color="grey-1" /></div>
 
-                    <!-- 🌟 新增：客戶年齡與性別 (透過輔助函式轉換格式) -->
+                    <!-- 客戶年齡與性別 (🌟 已封裝) -->
                     <div class="col-6"><q-input :model-value="calculateAge(auditDialog.form.birthday)" label="客戶年齡" dense outlined readonly bg-color="grey-1" /></div>
                     <div class="col-6"><q-input :model-value="formatGender(auditDialog.form.gender)" label="客戶性別" dense outlined readonly bg-color="grey-1" /></div>
 
-                    <!-- 🌟 新增：保額限制範圍與保單風險等級 -->
+                    <!-- 保額限制範圍與保單風險等級 (🌟 已封裝) -->
                     <div class="col-6">
                       <q-input 
                         :model-value="`$${formatMoney(auditDialog.form.minAmount)} ~ $${formatMoney(auditDialog.form.maxAmount)}`" 
@@ -249,7 +249,7 @@
                     <div class="col-12"><q-input v-model="auditDialog.form.remark" type="textarea" rows="3" label="原受理備註說明" dense outlined readonly bg-color="grey-1" /></div>
                   </div>
 
-                  <!-- 檔案連結區塊 -->
+                  <!-- 檔案連結區塊 (🌟 已修正為正確的 auditDialog.form) -->
                   <div v-if="auditDialog.form.file01Path || auditDialog.form.file02Path" class="q-mt-md">
                     <div class="text-subtitle2 text-weight-bold text-grey-8 q-mb-xs">佐證電子文件 (點擊開啟)</div>
                     <div class="row q-gutter-sm q-py-xs">
@@ -314,12 +314,31 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
-import axios from 'axios'
+import http from '@/api/http' // 🌟 引入 http，完美與後端安全對齊
 import type { QTableColumn } from 'quasar'
 import PageHero from '@/components/layout/PageHero.vue'
+
+// 🌟 引入封裝工具
+import { useClaimHelpers } from '@/composables/useClaimHelpers'
+
 const route = useRoute()
 const router = useRouter()
 const $q = useQuasar()
+
+const { 
+  formatDate, 
+  formatMoney, 
+  getStatusColor, 
+  getStatusLabel, 
+  getStatusLabellog, 
+  calculateAge, 
+  formatGender, 
+  formatRiskLevel, 
+  viewPdf,
+  getUserRole,
+  isAuditState
+} = useClaimHelpers()
+
 const loading = ref(false)
 const rows = ref([])
 const historyLogs = ref<any[]>([])
@@ -346,13 +365,13 @@ const columns: QTableColumn[] = [
 
 const auditDialog = reactive({ show: false, form: {} as any })
 const auditForm = reactive({ action: '', approveAmount: null as number | null, remark: '' })
-const activeTab = ref('detail') // 預設進來彈窗時，停在「案件詳情與文件」頁籤
+const activeTab = ref('detail') 
 
-// 載入審核清單
+// 載入審核清單 (已改用 http 實例)
 async function loadAuditData() {
   loading.value = true
   try {
-    const res = await axios.get('/api/admin/claim-audit/list', { params: filters })
+    const res = await http.get('/api/admin/claim-audit/list', { params: filters })
     rows.value = res.data.DATA
   } catch (err) {
     $q.notify({ type: 'negative', message: '讀取審核列表失敗' })
@@ -361,15 +380,15 @@ async function loadAuditData() {
   }
 }
 
-// 開啟審核大窗並抓取 Audit Log 軌跡
+// 開啟審核大窗並抓取 Audit Log 軌跡 (已改用 http 實例)
 async function openAuditDialog(row: any) {
   auditDialog.show = true
   
   try {
-    const res = await axios.get(`/api/admin/claim/${row.claimNo}`)
+    const res = await http.get(`/api/admin/claim/${row.claimNo}`)
     auditDialog.form = res.data.DATA
     
-    const logRes = await axios.get(`/api/admin/claim-audit/logs/${row.claimNo}`)
+    const logRes = await http.get(`/api/admin/claim-audit/logs/${row.claimNo}`)
     historyLogs.value = logRes.data.DATA
     
   } catch (err) {
@@ -381,33 +400,18 @@ async function openAuditDialog(row: any) {
   auditForm.action = ''
   auditForm.approveAmount = row.claimStatus === 'APPROVED' ? row.approveAmount : row.claimAmount
   auditForm.remark = ''
-  activeTab.value = 'detail' // 每次開新彈窗時，都要強迫重置回第一個分頁
+  activeTab.value = 'detail' 
 }
 
-// 新增：依據角色與狀態判斷是否屬於可「進入審核關卡」的狀態
-function isAuditState(row: any): boolean {
-  const role = getUserRole().toUpperCase().trim();
-  const status = row.claimStatus;
-  
-  if (role === 'APPLICANT') {
-    return status === 'SUBMIT';
-  } else if (role === 'REVIEWER' || role === 'ADMIN') {
-    return status === 'PENDING';
-  }
-  return false;
-}
-
-// 提交核決：同意、駁回、或撤回
+// 提交核決：同意、駁回、或撤回 (已改用 http 實例)
 async function submitDecision(actionType: string) {
   auditForm.action = actionType
   
-  // 新增：意見/備註原因必填防呆
   if (!auditForm.remark || !auditForm.remark.trim()) {
     $q.notify({ type: 'warning', message: '請填寫核決審核意見 / 理由原因！' })
     return
   }
 
-  // 如果欄位被清空變成 null 或 undefined，強行校正為 0
   if (auditForm.approveAmount === null || auditForm.approveAmount === undefined) {
     auditForm.approveAmount = 0
   }
@@ -435,7 +439,7 @@ async function submitDecision(actionType: string) {
         }
       }
 
-      await axios.put('/api/admin/claim-audit/decision', {
+      await http.put('/api/admin/claim-audit/decision', {
         claimNo: auditDialog.form.claimNo,
         action: auditForm.action,
         approveAmount: ['APPROVED', 'PENDING'].includes(auditForm.action)
@@ -446,123 +450,14 @@ async function submitDecision(actionType: string) {
       })
       $q.notify({ type: 'positive', message: '理賠核決與履歷更新成功！' })
       auditDialog.show = false
-      router.push({ path: '/claim/ClaimManagement' })
+      loadAuditData() 
     } catch (err) {
       $q.notify({ type: 'negative', message: '提交審核決策時失敗' })
     }
   })
 }
 
-function getStatusColor(status: string) {
-  switch (status) {
-    case 'APPROVED': return 'green-7'
-    case 'REJECTED': return 'red-7'
-    case 'RETURN': return 'orange-9'
-    case 'PENDING': return 'blue-7'
-    default: return 'blue-grey-6'
-  }
-}
-
-function getStatusLabel(status: string): string {
-  const map: Record<string, string> = {
-    SUBMIT: '初審',
-    PENDING: '複審',
-    APPROVED: '已核准',
-    REJECTED: '已駁回',
-    RETURN: '退回補件中'
-  }
-  return map[status] || status // 如果後端回傳了未定義的狀態，則顯示原英文
-}
-
-function getStatusLabellog(status: string): string {
-  const map: Record<string, string> = {
-    SUBMIT: '送件',
-    PENDING: '初審',
-    APPROVED: '已核准',
-    REJECTED: '已駁回',
-    RETURN: '退回補件中'
-  }
-  return map[status] || status // 如果後端回傳了未定義的狀態，則顯示原英文
-}
-
-
-function getLogIcon(status: string) {
-  switch (status) {
-    case 'APPROVED': return 'check'
-    case 'REJECTED': return 'close'
-    case 'RETURN': return 'undo'
-    default: return 'edit'
-  }
-}
-
-function formatDate(dateStr: string) {
-  if (!dateStr) return ''
-  return dateStr.replace('T', ' ').substring(0, 19)
-}
-
-onMounted(async () => {
-  const prefilledPolicyNo = route.query.policyNo
-  if (typeof prefilledPolicyNo === 'string' && prefilledPolicyNo.trim()) {
-    filters.policyNo = prefilledPolicyNo.trim()
-  }
-
-  await loadAuditData()
-
-  const prefilledClaimNo = route.query.claimNo
-  if (typeof prefilledClaimNo === 'string' && prefilledClaimNo.trim()) {
-    router.replace({ query: {} })
-    const target = (rows.value as any[]).find(r => r.claimNo === prefilledClaimNo.trim())
-    if (target) openAuditDialog(target)
-  }
-})
-
-watch(
-  () => route.query.claimNo,
-  async (claimNo) => {
-    if (typeof claimNo === 'string' && claimNo.trim()) {
-      const policyNo = route.query.policyNo
-      if (typeof policyNo === 'string' && policyNo.trim()) {
-        filters.policyNo = policyNo.trim()
-      }
-      await loadAuditData()
-      router.replace({ query: {} })
-      const target = (rows.value as any[]).find((r: any) => r.claimNo === claimNo.trim())
-      if (target) openAuditDialog(target)
-    }
-  }
-)
-
-// 獲取當前登入使用者的 ROLE_CODE 權限
-function getUserRole(): string {
-  const userJson = localStorage.getItem('User')
-  if (userJson) {
-    try {
-      const userObj = JSON.parse(userJson)
-      return userObj.ROLE_CODE || ''
-    } catch (e) {
-      console.error('讀取角色權限失敗', e)
-    }
-  }
-  return ''
-}
-
-function viewPdf(path: string | undefined) {
-  if (!path) return;
-
-  if (path.startsWith('http')) {
-    window.open(path, '_blank');
-    return;
-  }
-
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8085';
-  const cleanBase = baseUrl.replace(/\/$/, '');
-  const cleanPath = path.startsWith('/') ? path : `/${path}`;
-  const fullUrl = `${cleanBase}${cleanPath}`;
-  
-  console.log('準備開啟檔案，網址為:', fullUrl);
-  window.open(fullUrl, '_blank');
-}
-
+// 自動初審與保單等待期規則比對
 const auditRules = computed(() => {
   const form = auditDialog.form;
   if (!form.policyNo || !form.applyTime) return { pass: true, msg: '資料載入中...' };
@@ -587,11 +482,6 @@ const auditRules = computed(() => {
   return { pass: true, msg: '保單效期與等待期檢查通過' };
 });
 
-function formatMoney(val: any) {
-  if (val === null || val === undefined || isNaN(Number(val))) return '0'
-  return Number(val).toLocaleString('en-US')
-}
-
 function onAmountInput(val: string | number | null) {
   if (val === null || val === undefined) {
     auditForm.approveAmount = 0;
@@ -601,37 +491,13 @@ function onAmountInput(val: string | number | null) {
   auditForm.approveAmount = cleanNum === '' ? 0 : Number(cleanNum);
 }
 
-// 新增：依生日動態計算年齡
-function calculateAge(birthday: string | null | undefined): string {
-  if (!birthday) return '未提供生日'
-  const birthDate = new Date(birthday)
-  const today = new Date()
-  let age = today.getFullYear() - birthDate.getFullYear()
-  const monthDiff = today.getMonth() - birthDate.getMonth()
-  
-  // 若今年生日還沒過，年齡減一歲
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age--
+onMounted(async () => {
+  await loadAuditData()
+  const prefilledClaimNo = route.query.claimNo
+  if (typeof prefilledClaimNo === 'string' && prefilledClaimNo.trim()) {
+    router.replace({ query: {} })
+    const target = (rows.value as any[]).find(r => r.claimNo === prefilledClaimNo.trim())
+    if (target) openAuditDialog(target)
   }
-  return isNaN(age) ? '格式錯誤' : `${age} 歲`
-}
-
-// 新增：格式化性別代碼為中文
-function formatGender(gender: string | null | undefined): string {
-  if (!gender) return '-'
-  const g = gender.toUpperCase().trim()
-  if (g === 'M' || g === 'MALE') return '男 (Male)'
-  if (g === 'F' || g === 'FEMALE') return '女 (Female)'
-  return gender
-}
-
-// 新增：格式化風險等級代碼
-function formatRiskLevel(level: string | null | undefined): string {
-  if (!level) return '未評估'
-  const l = level.toUpperCase().trim()
-  if (l === 'HIGH') return '高風險 (HIGH)'
-  if (l === 'MEDIUM') return '中風險 (MEDIUM)'
-  if (l === 'LOW') return '低風險 (LOW)'
-  return level
-}
+})
 </script>
