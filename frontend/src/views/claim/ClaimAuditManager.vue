@@ -429,11 +429,11 @@ async function submitDecision(actionType: string) {
   }).onOk(async () => {
     try {
       const userJson = localStorage.getItem('User');
-      let currentUserName = '審核主管';
+      let currentUsername = 'SYSTEM_AUDITOR';
       if (userJson) {
         try {
           const userObj = JSON.parse(userJson);
-          currentUserName = userObj.DISPLAY_NAME || '審核主管';
+          currentUsername = userObj.USERNAME || 'SYSTEM_AUDITOR';
         } catch (e) {
           console.error(e);
         }
@@ -446,7 +446,7 @@ async function submitDecision(actionType: string) {
           ? auditForm.approveAmount
           : null,
         remark: auditForm.remark,
-        aprvUser: currentUserName 
+        aprvUser: currentUsername
       })
       $q.notify({ type: 'positive', message: '理賠核決與履歷更新成功！' })
       auditDialog.show = false

@@ -51,7 +51,7 @@ async function resolvePolicyNo(refNo: string): Promise<string> {
   try {
     const res = await fetch(`/api/admin/claim/${refNo}`)
     const data = await res.json()
-    return data?.data?.policyNo ?? refNo
+    return data?.DATA?.policyNo ?? refNo
   } catch {
     return refNo
   }

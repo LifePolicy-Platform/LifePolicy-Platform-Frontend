@@ -301,6 +301,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 import type { QTableProps } from 'quasar'
 import PageHero from '@/components/layout/PageHero.vue'
@@ -320,6 +321,7 @@ import {
 } from '@/api/claim'
 
 const $q = useQuasar()
+const route = useRoute()
 const { formatDate, formatMoney, getStatusColor, getStatusLabel, viewPdf } = useClaimHelpers()
 const { 
   memberOptions, policyOptions, agentOptions, 
@@ -627,7 +629,21 @@ async function saveClaim() {
 }
 
 onMounted(() => {
+  const queryPolicyNo = route.query.policyNo
+  if (queryPolicyNo && typeof queryPolicyNo === 'string') {
+    filters.policyNo = queryPolicyNo
+  }
   loadData()
   preloadOptions()
 })
+
+watch(
+  () => route.query.policyNo,
+  (policyNo) => {
+    if (typeof policyNo === 'string' && policyNo.trim()) {
+      filters.policyNo = policyNo.trim()
+      loadData()
+    }
+  }
+)
 </script>

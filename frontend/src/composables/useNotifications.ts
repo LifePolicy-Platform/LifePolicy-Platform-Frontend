@@ -8,7 +8,7 @@ import {
 } from '@/api/notification'
 import type { NotificationItem } from '@/types/notification'
 
-const POLL_INTERVAL_MS = 60_000
+const POLL_INTERVAL_MS = 20_000
 
 export function useNotifications() {
   const authStore = useAuthStore()
@@ -19,12 +19,12 @@ export function useNotifications() {
   let timer: ReturnType<typeof setInterval> | null = null
 
   async function refreshCount() {
-    // if (!authStore.isAuthenticated) return
-    // try {
-    //   unreadCount.value = await fetchUnreadCount()
-    // } catch {
-    //   // 靜默失敗，不中斷畫面
-    // }
+    if (!authStore.isAuthenticated) return
+    try {
+      unreadCount.value = await fetchUnreadCount()
+    } catch {
+      // 靜默失敗，不中斷畫面
+    }
   }
 
   async function loadNotifications() {
@@ -32,6 +32,8 @@ export function useNotifications() {
     isLoading.value = true
     try {
       notifications.value = await fetchNotifications(0, 15)
+    } catch {
+      // 靜默失敗，保留舊清單不清空
     } finally {
       isLoading.value = false
     }
@@ -52,11 +54,11 @@ export function useNotifications() {
 
   onMounted(() => {
     refreshCount()
-    // timer = setInterval(refreshCount, POLL_INTERVAL_MS)
+    timer = setInterval(refreshCount, POLL_INTERVAL_MS)
   })
 
   onUnmounted(() => {
-    // if (timer) clearInterval(timer)
+    if (timer) clearInterval(timer)
   })
 
   return {
