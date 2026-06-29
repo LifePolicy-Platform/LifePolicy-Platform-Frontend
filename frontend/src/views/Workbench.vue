@@ -161,6 +161,19 @@ watch(activeTab, (tab) => {
   }
 })
 
+watch(
+  () => route.query.policyNo,
+  async (policyNo) => {
+    if (typeof policyNo === 'string' && policyNo.trim()) {
+      activeTab.value = 'query'
+      queryForm.applicationId = policyNo.trim()
+      router.replace({ query: { tab: 'query' } })
+      await nextTick()
+      handleQuery({ silent: true })
+    }
+  }
+)
+
 const workflowSteps: { key: TabKey; icon: string; label: string; desc: string }[] = [
   { key: 'create', icon: 'add_circle_outline', label: '新增案件', desc: '建立投保資料' },
   { key: 'query', icon: 'search', label: '查詢案件', desc: '搜尋與檢視' },

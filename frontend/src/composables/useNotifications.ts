@@ -8,7 +8,7 @@ import {
 } from '@/api/notification'
 import type { NotificationItem } from '@/types/notification'
 
-const POLL_INTERVAL_MS = 60_000
+const POLL_INTERVAL_MS = 20_000
 
 export function useNotifications() {
   const authStore = useAuthStore()
@@ -32,6 +32,8 @@ export function useNotifications() {
     isLoading.value = true
     try {
       notifications.value = await fetchNotifications(0, 15)
+    } catch {
+      // 靜默失敗，保留舊清單不清空
     } finally {
       isLoading.value = false
     }
