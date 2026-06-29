@@ -627,21 +627,7 @@ async function saveClaim() {
 }
 
 onMounted(() => {
-  const prefilledPolicyNo = route.query.policyNo
-  if (typeof prefilledPolicyNo === 'string' && prefilledPolicyNo.trim()) {
-    filters.policyNo = prefilledPolicyNo.trim()
-  }
   loadData()
   preloadOptions()
 })
-
-watch(
-  () => route.query.policyNo,
-  (policyNo) => {
-    if (typeof policyNo === 'string' && policyNo.trim()) {
-      filters.policyNo = policyNo.trim()
-      loadData()
-    }
-  }
-)
 </script>
