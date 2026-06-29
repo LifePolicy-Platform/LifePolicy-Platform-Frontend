@@ -57,8 +57,13 @@ async function resolvePolicyNo(refNo: string): Promise<string> {
   }
 }
 
+// 待辦類通知由後端審核完成後自動清除，點擊不標已讀
+const ACTION_TITLES = ['理賠新件待審', '理賠案件待複審']
+
 async function handleClick(notifNo: number, refNo: string | null, notifType: string, title: string) {
-  await markAsRead(notifNo)
+  if (!ACTION_TITLES.includes(title)) {
+    await markAsRead(notifNo)
+  }
   close()
 
   const isClaimResult =
