@@ -168,12 +168,12 @@
                 <div v-if="isAuditState(auditDialog.form)" class="row justify-end q-gutter-sm q-mt-sm">
                   <!-- 經辦 (APPLICANT) 在 SUBMIT 狀態的按鈕 -->
                   <template v-if="getUserRole() === 'APPLICANT' && auditDialog.form.claimStatus === 'SUBMIT'">
-                    <q-btn 
+                    <q-btn
                       color="teal-7" 
                       label="送審遞呈" 
                       @click="submitDecision('PENDING')" 
                     />
-                    <q-btn 
+                    <q-btn
                       color="grey-7" 
                       label="撤回申請" 
                       @click="submitDecision('RETURN')" 
@@ -205,6 +205,10 @@
                 narrow-indicator
               >
                 <q-tab name="detail" label="案件詳情與文件" class="q-mr-sm" />
+                
+                <!-- 🌟 頁籤一點五：AI 智慧核決 (僅在符合審核關卡狀態下顯示) -->
+                <q-tab v-if="isAuditState(auditDialog.form)" name="ai" label="AI 智慧核決" class="q-mr-sm" />
+                
                 <q-tab name="history" class="q-px-md">
                   <div class="row items-center no-wrap">
                     <div>本案審核歷程</div>
@@ -229,11 +233,11 @@
                     <div class="col-6"><q-input v-model="auditDialog.form.memberName" label="客戶姓名" dense outlined readonly bg-color="grey-1" /></div>
                     <div class="col-6"><q-input v-model="auditDialog.form.productName" label="商品名稱" dense outlined readonly bg-color="grey-1" /></div>
 
-                    <!-- 客戶年齡與性別 (🌟 已封裝) -->
+                    <!-- 客戶年齡與性別 -->
                     <div class="col-6"><q-input :model-value="calculateAge(auditDialog.form.birthday)" label="客戶年齡" dense outlined readonly bg-color="grey-1" /></div>
                     <div class="col-6"><q-input :model-value="formatGender(auditDialog.form.gender)" label="客戶性別" dense outlined readonly bg-color="grey-1" /></div>
 
-                    <!-- 保額限制範圍與保單風險等級 (🌟 已封裝) -->
+                    <!-- 保額限制範圍與保單風險等級 -->
                     <div class="col-6">
                       <q-input 
                         :model-value="`$${formatMoney(auditDialog.form.minAmount)} ~ $${formatMoney(auditDialog.form.maxAmount)}`" 
@@ -249,12 +253,65 @@
                     <div class="col-12"><q-input v-model="auditDialog.form.remark" type="textarea" rows="3" label="原受理備註說明" dense outlined readonly bg-color="grey-1" /></div>
                   </div>
 
-                  <!-- 檔案連結區塊 (🌟 已修正為正確的 auditDialog.form) -->
+                  <!-- 檔案連結區塊 -->
                   <div v-if="auditDialog.form.file01Path || auditDialog.form.file02Path" class="q-mt-md">
                     <div class="text-subtitle2 text-weight-bold text-grey-8 q-mb-xs">佐證電子文件 (點擊開啟)</div>
                     <div class="row q-gutter-sm q-py-xs">
                       <q-btn v-if="auditDialog.form.file01Path" color="teal" outline :label="auditDialog.form.file01Name || '診斷書'" @click="viewPdf(auditDialog.form.file01Path)" />
                       <q-btn v-if="auditDialog.form.file02Path" color="teal" outline :label="auditDialog.form.file02Name || '收據'" @click="viewPdf(auditDialog.form.file02Path)" />
+                    </div>
+                  </div>
+                </q-tab-panel>
+
+                <!--  新增：AI 智慧核決助理展示面板 -->
+                <q-tab-panel name="ai" class="q-pa-md q-gutter-y-md">
+                  <div class="column q-gutter-y-sm">
+                    <div class="row items-center justify-between">
+                      <div class="text-subtitle2 text-weight-bold text-teal-10">AI 智慧核決與合規審核助理</div>
+                      <!-- 一鍵分析按鈕 -->
+                      <q-btn 
+                        color="teal-9" 
+                        size="sm" 
+                        unelevated
+                        label="一鍵智慧分析" 
+                        :loading="aiLoading" 
+                        @click="analyzeWithAi" 
+                      />
+                    </div>
+                    
+                    <q-separator class="q-my-xs" />
+
+                    <!-- AI 評估 -->
+                    <div 
+                      v-if="aiResult" 
+                      class="rounded-borders text-body2 text-grey-9 scroll q-pa-md q-mt-sm" 
+                      style="
+                        line-height: 1.6; 
+                        height: 380px; 
+                        overflow-y: auto;
+                        border-left: 5px solid var(--q-teal-9);
+                        background: linear-gradient(135deg, rgba(224, 242, 241, 0.75) 0%, rgba(240, 253, 250, 0.45) 100%);
+                        backdrop-filter: blur(8px);
+                        -webkit-backdrop-filter: blur(8px);
+                        border-top: 1px solid rgba(255, 255, 255, 0.8);
+                        border-right: 1px solid rgba(0, 150, 136, 0.1);
+                        border-bottom: 1px solid rgba(0, 150, 136, 0.1);
+                        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.03), 0 6px 15px rgba(0, 150, 136, 0.08);
+                      "
+                    >
+                      <div class="row items-center text-weight-bold text-teal-10 q-mb-sm">
+                        <size="18px" class="q-mr-xs text-amber-8" />
+                        評估報告
+                      </div>
+                      <div class="text-grey-9 text-body2" style="white-space: pre-line;">
+                        {{ aiResult.replace(/\*\*/g, '') }}
+                      </div>
+                    </div>
+                    
+                    <!-- 初始未分析狀態 -->
+                    <div v-else class="text-caption text-grey-5 text-center q-py-xl bg-teal-1 rounded-borders" style="border: 1px dashed var(--q-teal-3);">
+                      <div class="text-subtitle2 text-teal-9 text-weight-bold">準備進行 AI 核決診斷</div>
+                      <div class="text-caption text-grey-6">點擊上方一鍵智慧分析按鈕，由實體 Gemini-2.5 進行診斷書看圖與醫理判讀</div>
                     </div>
                   </div>
                 </q-tab-panel>
@@ -311,14 +368,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue' // 🌟 補上了 watch
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
-import http from '@/api/http' // 🌟 引入 http，完美與後端安全對齊
+import http from '@/api/http' 
 import type { QTableColumn } from 'quasar'
 import PageHero from '@/components/layout/PageHero.vue'
 
-// 🌟 引入封裝工具
+// 引入封裝工具
 import { useClaimHelpers } from '@/composables/useClaimHelpers'
 
 const route = useRoute()
@@ -367,7 +424,11 @@ const auditDialog = reactive({ show: false, form: {} as any })
 const auditForm = reactive({ action: '', approveAmount: null as number | null, remark: '' })
 const activeTab = ref('detail') 
 
-// 載入審核清單 (已改用 http 實例)
+// 控制 AI 的變數
+const aiLoading = ref(false)
+const aiResult = ref('')
+
+// 載入審核清單
 async function loadAuditData() {
   loading.value = true
   try {
@@ -380,14 +441,20 @@ async function loadAuditData() {
   }
 }
 
-// 開啟審核大窗並抓取 Audit Log 軌跡 (已改用 http 實例)
+// 開啟審核大窗並抓取 Audit Log 軌跡
 async function openAuditDialog(row: any) {
   auditDialog.show = true
+  aiResult.value = '' // 每次開新彈窗時，強迫清除上一個案子的 AI 殘留分析報告！
   
   try {
     const res = await http.get(`/api/admin/claim/${row.claimNo}`)
     auditDialog.form = res.data.DATA
     
+    // 新增：如果資料庫裡本來就有快取的 AI 分析報告，一開大窗就自動直接帶入顯示，連按鈕都不用按！
+    if (res.data.DATA.aiAnalysis) {
+      aiResult.value = res.data.DATA.aiAnalysis
+    }
+
     const logRes = await http.get(`/api/admin/claim-audit/logs/${row.claimNo}`)
     historyLogs.value = logRes.data.DATA
     
@@ -400,18 +467,44 @@ async function openAuditDialog(row: any) {
   auditForm.action = ''
   auditForm.approveAmount = row.claimStatus === 'APPROVED' ? row.approveAmount : row.claimAmount
   auditForm.remark = ''
-  activeTab.value = 'detail' 
+  activeTab.value = 'detail' // 預設停在基本頁籤
 }
 
-// 提交核決：同意、駁回、或撤回 (已改用 http 實例)
+// 呼叫後端一鍵 AI 智慧分析
+async function analyzeWithAi() {
+  aiLoading.value = true
+  aiResult.value = '' 
+  try {
+    const res = await http.post('/api/admin/claim-audit/ai-analyze', {
+      claimNo: auditDialog.form.claimNo,
+      auditRuleMsg: auditRules.value.msg
+    })
+    aiResult.value = res.data.DATA
+  } catch (err: any) {
+    $q.notify({ type: 'negative', message: 'AI 分析失敗: ' + (err.message || '') })
+  } finally {
+    aiLoading.value = false
+  }
+}
+
+// 監聽彈窗顯示狀態，只要關閉彈窗 (show 變為 false)，立刻自動清空 AI 文字。加上了 : boolean 強型別宣告，解決 TypeScript 紅字
+watch(() => auditDialog.show, (newVal: boolean) => {
+  if (!newVal) {
+    aiResult.value = ''
+  }
+})
+
+// 提交核決：同意、駁回、或撤回
 async function submitDecision(actionType: string) {
   auditForm.action = actionType
   
+  // 意見/備註原因必填防呆
   if (!auditForm.remark || !auditForm.remark.trim()) {
     $q.notify({ type: 'warning', message: '請填寫核決審核意見 / 理由原因！' })
     return
   }
 
+  // 如果欄位被清空變成 null 或 undefined，強行校正為 0
   if (auditForm.approveAmount === null || auditForm.approveAmount === undefined) {
     auditForm.approveAmount = 0
   }
@@ -450,7 +543,7 @@ async function submitDecision(actionType: string) {
       })
       $q.notify({ type: 'positive', message: '理賠核決與履歷更新成功！' })
       auditDialog.show = false
-      loadAuditData() 
+      loadAuditData() // 刷新主清單
     } catch (err) {
       $q.notify({ type: 'negative', message: '提交審核決策時失敗' })
     }
