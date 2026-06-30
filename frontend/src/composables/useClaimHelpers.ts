@@ -97,7 +97,7 @@ export function useClaimHelpers() {
     window.open(`${cleanBase}${cleanPath}`, '_blank')
   }
 
-  // 🌟 10. 新增：獲取當前登入使用者的 ROLE_CODE 權限
+  // 10. 新增：獲取當前登入使用者的 ROLE_CODE 權限
   function getUserRole(): string {
     const userJson = localStorage.getItem('User')
     if (userJson) {
@@ -111,7 +111,7 @@ export function useClaimHelpers() {
     return ''
   }
 
-  // 🌟 11. 新增：依據角色與狀態判斷是否屬於可「進入審核關卡」的狀態
+  // 11. 新增：依據角色與狀態判斷是否屬於可「進入審核關卡」的狀態
   function isAuditState(row: any): boolean {
     const role = getUserRole().toUpperCase().trim()
     const status = row.claimStatus
@@ -134,7 +134,7 @@ export function useClaimHelpers() {
     formatGender,
     formatRiskLevel,
     viewPdf,
-    getUserRole,     // 🌟 匯出
-    isAuditState     // 🌟 匯出
+    getUserRole,
+    isAuditState
   }
 }
