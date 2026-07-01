@@ -494,6 +494,22 @@ watch(() => auditDialog.show, (newVal: boolean) => {
   }
 })
 
+// Deep-link：使用者已在本頁時點通知 bell，router.push 只更新 query 不重新 mount
+// 監聽 claimNo query 變化，自動清空篩選、重載清單並開啟對應案件
+watch(
+  () => route.query.claimNo,
+  async (claimNo) => {
+    if (typeof claimNo === 'string' && claimNo.trim()) {
+      router.replace({ query: {} })
+      filters.status = ''
+      filters.policyNo = ''
+      await loadAuditData()
+      const target = (rows.value as any[]).find(r => r.claimNo === claimNo.trim())
+      if (target) openAuditDialog(target)
+    }
+  }
+)
+
 // 提交核決：同意、駁回、或撤回
 async function submitDecision(actionType: string) {
   auditForm.action = actionType
