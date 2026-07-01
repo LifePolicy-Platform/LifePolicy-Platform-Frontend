@@ -9,7 +9,7 @@ export function useClaimOptions() {
   const filteredMemberOptions = ref<any[]>([])
   const filteredPolicyOptions = ref<any[]>([])
 
-  // 🌟 一口氣併發撈取所有下拉選單
+  // 撈取所有下拉選單
   async function preloadOptions() {
     try {
       const [memberRes, policyRes, agentRes] = await Promise.all([

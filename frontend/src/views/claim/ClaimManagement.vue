@@ -95,7 +95,7 @@
             <q-input v-model="dialog.form.claimStatus" label="目前狀態" dense outlined readonly bg-color="grey-2" />
           </div>
 
-          <!-- 客戶選擇區塊 (🌟 前後端對齊：改用 value 與 label) -->
+          <!-- 客戶選擇區塊 (前後端對齊：改用 value 與 label) -->
           <div v-if="!dialog.form.claimNo && !dialog.isView" class="col-12">
             <q-select
               v-model="dialog.form.memberId"
@@ -142,7 +142,7 @@
             </div>
           </template>
 
-          <!-- 保單選擇區塊 (🌟 前後端對齊：改用 value 與 label，以及 extra) -->
+          <!-- 保單選擇區塊 (前後端對齊：改用 value 與 label，以及 extra) -->
           <div v-if="!dialog.form.claimNo && !dialog.isView" class="col-12">
             <q-select
               v-if="memberPolicyCount !== 0"
@@ -203,7 +203,7 @@
             />
           </div>
 
-          <!-- 負責經辦人員 (🌟 對應全域單例 OptionResponse DTO 欄位) -->
+          <!-- 負責經辦人員 (對應全域單例 OptionResponse DTO 欄位) -->
           <div class="col-12">
             <q-input
               v-if="dialog.isView"
@@ -306,7 +306,7 @@ import { useQuasar } from 'quasar'
 import type { QTableProps } from 'quasar'
 import PageHero from '@/components/layout/PageHero.vue'
 
-// 🌟 匯入 Composables
+// 匯入 Composables
 import { useClaimHelpers } from '@/composables/useClaimHelpers'
 import { useClaimOptions } from '@/composables/useClaimOptions'
 
@@ -359,7 +359,7 @@ const displayApproveAmount = computed(() => {
   return `$${formatMoney(dialog.form.approveAmount)}`
 })
 
-// 🌟 對應全域單例 OptionResponse DTO 轉換
+// 對應全域單例 OptionResponse DTO 轉換
 const memberNameMap = computed(() => {
   const map: Record<number, string> = {}
   memberOptions.value.forEach(m => {
@@ -391,7 +391,7 @@ const uploading02 = ref(false)
 
 const memberPolicyCount = computed(() => {
   if (!dialog.form.memberId) return -1
-  // 🌟 DTO 結構下，保單所屬客戶 ID 存在 extra 欄位
+  // DTO 結構下，保單所屬客戶 ID 存在 extra 欄位
   return policyOptions.value.filter(p => p.extra === dialog.form.memberId).length
 })
 
@@ -506,7 +506,7 @@ async function openDialog(targetRow: ClaimModel | null) {
       loading.value = false
     }
   } else {
-    // 📞 新增模式
+    // 新增模式
     await preloadOptions()
     const currentUser = getCurrentUser()
 
@@ -520,7 +520,7 @@ async function openDialog(targetRow: ClaimModel | null) {
       agentId: currentUser ? currentUser.agentId : null,
       agentName: currentUser ? currentUser.agentName : '',
       remark: '',
-      updateUser: null, // 新增模式不顯示輸入框，固定送 null
+      updateUser: null,
       memberName: '',
       productCode: '',
       productName: ''
