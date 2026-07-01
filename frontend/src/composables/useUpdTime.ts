@@ -1,6 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
-import { batchUpdateAptRecords, searchAptRecords, searchAptRecordsByCustName } from '@/services/appointmentService'
+import { batchUpdateAptRecords, searchAptRecords, searchAptRecordsByIdentityCard } from '@/services/appointmentService'
 import type {
   AptBatchUpdateResponse,
   AptRecordListRequest,
@@ -40,13 +40,21 @@ export function useUpdTime() {
   const searchEndDate = ref(toInputDate(now))
   const searchEndTime = ref('22:00')
 
+const ID_NO_PATTERN = /^[A-Z][0-9]{9}$/
+
   // --- 約訪歷程查詢 ---
-  const historyCustName = ref('')
+  const historyIdentityCard = ref('')
   const historyRows = ref<AptRecordListResponse[]>([])
   const isHistoryLoading = ref(false)
   const historyErrorMsg = ref('')
-  const historyNameError = ref('')
+  const historyIdError = ref('')
   const historyHasSearched = ref(false)
+
+  const historyCustName = computed(() => {
+    if (!historyHasSearched.value) return ''
+    const name = historyRows.value.find((row) => row.custName?.trim())?.custName?.trim()
+    return name || '—'
+  })
 
   // --- 查詢結果與勾選 ---
   const rows = ref<AptRecordListResponse[]>([])
@@ -241,24 +249,31 @@ export function useUpdTime() {
     }
   }
 
-  /** 約訪歷程：依客戶姓名查詢 */
+  /** 約訪歷程：依身分證字號查詢 */
   async function searchHistory() {
     historyErrorMsg.value = ''
-    historyNameError.value = ''
+    historyIdError.value = ''
 
-    const custName = historyCustName.value.trim()
-    if (!custName) {
-      historyNameError.value = '請輸入客戶姓名'
+    const identityCard = historyIdentityCard.value.trim().toUpperCase()
+    if (!identityCard) {
+      historyIdError.value = '請輸入身分證字號'
+      return
+    }
+    if (!ID_NO_PATTERN.test(identityCard)) {
+      historyIdError.value = '身分證格式需為 1 個英文字母加 9 碼數字'
       return
     }
 
-    historyCustName.value = custName
+    historyIdentityCard.value = identityCard
     isHistoryLoading.value = true
     try {
-      historyRows.value = await searchAptRecordsByCustName(custName)
+      historyRows.value = await searchAptRecordsByIdentityCard(identityCard)
       historyHasSearched.value = true
-    } catch {
-      historyErrorMsg.value = '查詢失敗，請稍後再試'
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { MESSAGE?: string; message?: string } } }
+      historyErrorMsg.value = err.response?.data?.MESSAGE
+        ?? err.response?.data?.message
+        ?? '查詢失敗，請稍後再試'
       historyRows.value = []
       historyHasSearched.value = true
     } finally {
@@ -338,9 +353,9 @@ export function useUpdTime() {
   }
 
   function resetHistoryFilters() {
-    historyCustName.value = ''
+    historyIdentityCard.value = ''
     historyErrorMsg.value = ''
-    historyNameError.value = ''
+    historyIdError.value = ''
     historyHasSearched.value = false
     historyRows.value = []
   }
@@ -369,12 +384,13 @@ export function useUpdTime() {
     searchAppointments,
     saveUpdate,
     resetSearchFilters,
-    historyCustName,
+    historyIdentityCard,
     historyRows,
     isHistoryLoading,
     historyErrorMsg,
-    historyNameError,
+    historyIdError,
     historyHasSearched,
+    historyCustName,
     searchHistory,
     resetHistoryFilters,
   }

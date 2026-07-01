@@ -27,11 +27,11 @@ export async function fetchAptRecords(params: AptRecordListRequest) {
   return response.data.DATA ?? []
 }
 
-/** 依客戶姓名查詢約訪歷程 */
-export async function fetchAptRecordsByCustName(custName: string) {
+/** 依身分證字號查詢約訪歷程 */
+export async function fetchAptRecordsByIdentityCard(identityCard: string) {
   const response = await http.get<ApiEnvelope<AptRecordListResponse[]>>(
     '/api/apt-records/history',
-    { params: { name: custName } },
+    { params: { identityCard: identityCard.trim().toUpperCase() } },
   )
   return unwrapCustomerData(response) ?? []
 }

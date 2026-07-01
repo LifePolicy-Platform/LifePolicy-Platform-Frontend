@@ -34,12 +34,13 @@ const {
   searchAppointments,
   saveUpdate,
   resetSearchFilters,
-  historyCustName,
+  historyIdentityCard,
   historyRows,
   isHistoryLoading,
   historyErrorMsg,
-  historyNameError,
+  historyIdError,
   historyHasSearched,
+  historyCustName,
   searchHistory,
   resetHistoryFilters,
 } = useUpdTime()
@@ -281,14 +282,14 @@ watch(historyRows, () => {
                     <div>
                       <p class="page-card__kicker">HISTORY</p>
                       <div class="page-card__title">查詢條件</div>
-                      <p class="page-card__desc">輸入客戶姓名查詢約訪紀錄</p>
+                      <p class="page-card__desc">輸入身分證字號查詢約訪紀錄</p>
                     </div>
                   </div>
 
                   <div class="upd-time-filter-row q-mt-sm">
                     <div class="upd-time-history-filter">
-                      <q-input v-model="historyCustName" label="客戶姓名" outlined dense clearable
-                        :error="!!historyNameError" :error-message="historyNameError" @keyup.enter="searchHistory" />
+                      <q-input v-model="historyIdentityCard" label="身分證字號" outlined dense clearable maxlength="10"
+                        :error="!!historyIdError" :error-message="historyIdError" @keyup.enter="searchHistory" />
                     </div>
                     <div class="upd-time-filter-actions row items-center no-wrap q-gutter-sm">
                       <q-btn color="primary" unelevated label="執行查詢" no-caps icon="search" size="m"
@@ -302,11 +303,20 @@ watch(historyRows, () => {
 
               <q-card flat class="page-card page-card--data">
                 <q-card-section>
-                  <div class="page-card__header q-mb-md">
+                  <div class="page-card__header q-mb-sm">
                     <div>
                       <p class="page-card__kicker">HISTORY LIST</p>
                       <div class="page-card__title">約訪紀錄</div>
-                      <p v-if="historyHasSearched" class="page-card__desc">共 {{ historyRows.length }} 筆結果</p>
+                    </div>
+                    <p v-if="historyHasSearched" class="page-card__desc q-mb-none upd-time-history-count">
+                      共 {{ historyRows.length }} 筆
+                    </p>
+                  </div>
+
+                  <div v-if="historyHasSearched" class="upd-time-history-subject q-mb-md">
+                    <q-avatar size="32px" color="primary" text-color="white" icon="person" class="upd-time-history-subject__avatar" />
+                    <div class="upd-time-history-subject__name">
+                      <span class="upd-time-history-subject__prefix">客戶姓名：</span>{{ historyCustName }}
                     </div>
                   </div>
 
@@ -318,7 +328,7 @@ watch(historyRows, () => {
                     :columns="historyColumns" row-key="sno" :loading="isHistoryLoading" :rows-per-page-options="[10]">
                     <template #no-data>
                       <div class="upd-time-table-empty text-grey-6">
-                        {{ historyHasSearched ? '查無資料，請調整查詢條件' : '請輸入客戶姓名後執行查詢' }}
+                        {{ historyHasSearched ? '查無資料，請調整查詢條件' : '請輸入身分證字號後執行查詢' }}
                       </div>
                     </template>
 
@@ -368,6 +378,38 @@ watch(historyRows, () => {
 
 .upd-time-panel {
   padding: 10px;
+}
+
+.upd-time-history-count {
+  align-self: flex-end;
+  white-space: nowrap;
+}
+
+.upd-time-history-subject {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--notus-green-soft);
+  border: 1px solid var(--notus-green-pale);
+}
+
+.upd-time-history-subject__avatar {
+  flex-shrink: 0;
+}
+
+.upd-time-history-subject__name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--notus-charcoal);
+  line-height: 1.35;
+}
+
+.upd-time-history-subject__prefix {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--notus-muted);
 }
 
 .upd-time-filter-row {
