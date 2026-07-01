@@ -26,7 +26,11 @@ const achievementGap = computed(() =>
 
 <template>
   <section class="home-page">
-    <PageHero compact title="首頁 數據分析" subtitle="今年業績概況、投保目標與保單申請趨勢" />
+    <PageHero
+      compact
+      title="首頁 數據分析"
+      subtitle="今年業績概況、投保目標與保單申請趨勢"
+    />
 
     <div class="home-body">
       <q-banner v-if="errorMessage" rounded class="bg-red-1 text-red-8">
