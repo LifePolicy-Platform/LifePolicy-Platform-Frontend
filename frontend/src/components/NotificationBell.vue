@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotifications } from '@/composables/useNotifications'
+import http from '@/api/http'
 
 const router = useRouter()
 const open = ref(false)
@@ -49,9 +50,8 @@ const CLAIM_RESULT_KEYWORDS = ['核准', '駁回', '退件']
 async function resolvePolicyNo(refNo: string): Promise<string> {
   if (!refNo.startsWith('CLM')) return refNo
   try {
-    const res = await fetch(`/api/admin/claim/${refNo}`)
-    const data = await res.json()
-    return data?.DATA?.policyNo ?? refNo
+    const res = await http.get(`/api/admin/claim/${refNo}`)
+    return res.data?.DATA?.policyNo ?? refNo
   } catch {
     return refNo
   }
